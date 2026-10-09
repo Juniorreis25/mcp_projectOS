@@ -29,4 +29,4 @@ npm test
 `npm test` starts the built server with a test token and checks health, MCP initialization, tool discovery, both catalog operations, authentication rejection, manifest-backed instructions, and path-traversal rejection.
 
 ## Vercel
-Use `apps/mcp-server` as the Vercel Root Directory and set `PROJECTOS_MCP_TOKEN` only in the Preview environment. The token is a personal pilot credential, not OAuth or per-user authorization. F2 is not complete until a preview URL is deployed and the authenticated and unauthenticated remote checks are recorded in `PROJECTOS_PLAN.md`.
+Use `apps/mcp-server` as the Vercel Root Directory and set `PROJECTOS_MCP_TOKEN` only in the Preview environment. The token is a personal pilot credential, not OAuth or per-user authorization. The verified preview URL and remote checks are recorded in `PROJECTOS_PLAN.md`; do not promote it to production without explicit approval.

@@ -18,7 +18,7 @@ The catalog loads the two fixed, versioned manifests and `SKILL.md` files from t
 A single pre-shared token is a pilot authorization mechanism, not OAuth nor per-user authorization. Production exposure requires a hardened authorization solution, approval, and verification. Workspace files and shell commands are not accessible to this remote server.
 
 ## Milestones
-F2: server implementation and local/CI authenticated validation. A Vercel preview remains pending until a Vercel project is linked and `PROJECTOS_MCP_TOKEN` is configured. F3: real-client compatibility with Codex and VS Code.
+F2: server implementation, local/CI validation, and a verified Vercel preview. The preview is not production and uses a personal pilot token, not OAuth. F3: real-client compatibility with Codex and VS Code.
 
 ## Vercel preview
 Create or link a Vercel project to this repository with `apps/mcp-server` as the Root Directory, Framework Preset `Next.js`, and Node.js 22. Add `PROJECTOS_MCP_TOKEN` as a Preview environment variable with at least 32 random characters. Deploy the branch, then validate `GET /api/health`, a `401` response without `Authorization`, and an authenticated MCP `initialize`, `tools/list`, and `tools/call` request. Do not use a query parameter as authentication and do not promote to production without explicit approval.
