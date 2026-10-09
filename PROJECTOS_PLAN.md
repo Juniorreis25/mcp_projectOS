@@ -15,8 +15,8 @@ Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para pro
 - **Status:** Em andamento; ainda não concluída.
 - **Critério:** Build limpo, instalação reproduzível, lint, testes aprovados, CI funcional e documentação de instalação.
 - **Evidências:** Código-fonte do monorepo publicado na branch `main` em `4a1befb47fb33f775c0e0df69a78e6999a3c8c38`; testes locais anteriores: 4 aprovados, build/typecheck aprovados.
-- **CI:** [Workflow F1 checks](https://github.com/Juniorreis25/mcp_projectOS/actions/runs/37939849554) acionado; inicialmente em fila, sem conclusão confirmada.
-- **Pendências:** Validar resultado do workflow; efetuar instalação limpa com lockfile; implementar lint completo; verificar adaptador MCP/Next.js ou documentar sua transferência deliberada para F2.
+- **CI:** [Workflow F1 checks](https://github.com/Juniorreis25/mcp_projectOS/actions/runs/37939849554) **concluído com sucesso** para o commit `4a1befb47fb33f775c0e0df69a78e6999a3c8c38`.
+- **Pendências:** Efetuar instalação limpa com lockfile; implementar lint completo; verificar adaptador MCP/Next.js ou documentar sua transferência deliberada para F2.
 - **Nota:** A rota MCP não está implementada nem publicada. Não confundir fundação com servidor operacional.
 
 ### F2 — MCP mínimo na Vercel
