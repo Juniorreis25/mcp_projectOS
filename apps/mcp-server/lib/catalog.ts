@@ -1,16 +1,40 @@
-export const skillCatalog = [
-  {id:'projectos.discover',version:'0.1.0',title:'Descoberta de projeto',modes:['new','existing','recovery'],read_only:true},
-  {id:'projectos.plan',version:'0.1.0',title:'Planejamento incremental',modes:['new','existing','recovery'],read_only:true}
-] as const;
-export function getSkillById(id:'projectos.discover'|'projectos.plan') {
-  switch(id) {
-    case 'projectos.discover': return {
-      ...skillCatalog[0],
-      instructions:'Inspect the project through authorized client capabilities. Never modify files during discovery. Return architecture, risks, unknowns and evidence references.'
-    };
-    case 'projectos.plan': return {
-      ...skillCatalog[1],
-      instructions:'Decompose the approved scope into incremental tasks, dependencies, acceptance criteria, risks and verification evidence. Never execute code or deployment as part of planning.'
-    };
-  }
+import { readFileSync } from 'node:fs';
+import { parseManifest, validateCatalog, type SkillManifest } from '../../../packages/skills/manifest';
+
+const skillSources = {
+  'projectos.discover': {
+    manifest: new URL('../../../skills/discover/manifest.yaml', import.meta.url),
+    instructions: new URL('../../../skills/discover/SKILL.md', import.meta.url),
+  },
+  'projectos.plan': {
+    manifest: new URL('../../../skills/plan/manifest.yaml', import.meta.url),
+    instructions: new URL('../../../skills/plan/SKILL.md', import.meta.url),
+  },
+} as const;
+
+export type SkillId = keyof typeof skillSources;
+export type SkillDefinition = SkillManifest & { instructions: string; resources: string[] };
+
+function readFixedWorkspaceFile(filename: URL): string {
+  return readFileSync(filename, 'utf8');
+}
+
+function loadSkill(id: SkillId): SkillDefinition {
+  const source = skillSources[id];
+  const manifest = parseManifest(readFixedWorkspaceFile(source.manifest));
+  if (manifest.id !== id) throw new Error(`CONFLICT: manifest id mismatch for ${id}`);
+  return {
+    ...manifest,
+    instructions: readFixedWorkspaceFile(source.instructions),
+    resources: ['manifest.yaml', 'SKILL.md'],
+  };
+}
+
+const loadedSkills = (Object.keys(skillSources) as SkillId[]).map(loadSkill);
+validateCatalog(loadedSkills);
+
+export const skillCatalog = loadedSkills.map(({ instructions: _instructions, ...manifest }) => manifest);
+
+export function getSkillById(id: string): SkillDefinition | undefined {
+  return loadedSkills.find(skill => skill.id === id);
 }

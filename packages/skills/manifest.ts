@@ -15,6 +15,7 @@ export function parseManifest(yaml:string):SkillManifest {
  for (const key of keys) if (!(key in output)) throw new Error(`INVALID_INPUT: missing ${key}`);
  const m=output as unknown as SkillManifest;
  if (m.schema_version!=='1.0' || !/^projectos\.[a-z][a-z0-9_-]*$/.test(m.id) || !/^\d+\.\d+\.\d+$/.test(m.version)) throw new Error('INVALID_INPUT: invalid identifiers');
+ if ([m.id,m.version,m.title,m.summary,m.risk_level,m.approval,m.execution_location].some(value=>!value.trim())) throw new Error('INVALID_INPUT: empty manifest field');
  if (!['low','moderate','critical'].includes(m.risk_level) || !['client','server'].includes(m.execution_location) || !['none','explicit'].includes(m.approval)) throw new Error('INVALID_INPUT: invalid policy');
  if (m.permissions.some(x=>!['project:read','project:write','command:execute','release:publish'].includes(x))) throw new Error('INVALID_INPUT: unknown permission');
  if (m.execution_location==='server' && m.permissions.includes('project:write')) throw new Error('FORBIDDEN: remote project writes');

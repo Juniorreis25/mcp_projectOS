@@ -16,9 +16,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm install --no-audit --no-fund
+      - run: npm ci
       - run: npm run typecheck
-      - run: npm run build
+      - run: npm test
       - name: Smoke test health and unauthorized MCP
         run: |
           PROJECTOS_MCP_TOKEN='projectos-test-token-not-for-production-123456789' npm run start -- --port 3100 > /tmp/projectos-next.log 2>&1 &
@@ -38,5 +38,5 @@ jobs:
             -H 'MCP-Protocol-Version: 2025-06-18' \
             -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}')"
           test "$MCP_CODE" = "200"
-          grep -q 'projectos_list_skills' /tmp/projectos-tools.json
-          grep -q 'projectos_get_skill' /tmp/projectos-tools.json
+          grep -q 'projectos.list_skills' /tmp/projectos-tools.json
+          grep -q 'projectos.get_skill' /tmp/projectos-tools.json

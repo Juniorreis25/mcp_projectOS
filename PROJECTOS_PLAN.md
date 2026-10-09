@@ -1,5 +1,5 @@
 # ProjectOS — Plano-Mestre de Implementação
-Versão: 1.6 | Atualizado em: 2026-10-09 | Status: F0 e F1 concluídas; F2 em andamento; F3–F8 não iniciadas
+Versão: 1.7 | Atualizado em: 2026-10-09 | Status: F0 e F1 concluídas; F2 em andamento; F3–F8 não iniciadas
 
 ## Objetivo
 Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para projetos novos, existentes e retomadas.
@@ -9,7 +9,7 @@ Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para pro
 ### F0 — Arquitetura e contratos
 - **Status:** Concluída, aprovada pelo proprietário em 2026-10-09.
 - **Entregas:** Blueprint, contratos, matriz de compatibilidade, permissões, manifestos, arquitetura de estado.
-- **Evidência:** Documento `docs/PROJECTOS_BLUEPRINT_F0.md` (a incorporar integralmente), aprovação explícita registrada na conversa.
+- **Evidência:** aprovação explícita registrada na conversa. Limitação auditada em F2: `docs/PROJECTOS_BLUEPRINT_F0.md` não está presente no repositório; não foi reconstruído.
 
 ### F1 — Fundação do repositório
 - **Status:** Concluída em 2026-10-09.
@@ -20,11 +20,11 @@ Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para pro
 - **Segurança:** workflow temporário de bootstrap com permissão de escrita foi removido antes da integração.
 
 ### F2 — MCP mínimo na Vercel
-- **Status:** Em andamento; implementação em branch `f2/mcp-remote-preview`, sem deploy confirmado.
-- **Implementado:** Next.js App Router com `mcp-handler` v2 e Streamable HTTP stateless em `/mcp`; list_skills/get_skill para discover e plan; `/api/health`; verificação de token Bearer por comparação constante.
-- **Evidência:** [CI build inicial aprovado](https://github.com/Juniorreis25/mcp_projectOS/actions/runs/37941420761). [Smoke HTTP autenticado aprovado](https://github.com/Juniorreis25/mcp_projectOS/actions/runs/37941702593): health check, rejeição 401 sem token e descoberta `tools/list` autenticada com duas ferramentas.
-- **Limitações:** token compartilhado apenas para piloto pessoal, não é OAuth. Não foi criado projeto Vercel; não há URL pública nem configuração de segredo. Invocação autenticada foi comprovada apenas em CI local, não na Vercel. Etapa não concluída.
-- **Atividades:** Streamable HTTP, autenticação, health check, list_skills/get_skill, catálogo inicial e preview.
+- **Status:** Em andamento; implementação corrigida em branch `codex/f2-mcp-server`, destinada ao PR #2; sem deploy confirmado.
+- **Implementado:** Next.js 16.4.0, `mcp-handler` 2.3.0, SDK MCP 2.3.1, Streamable HTTP stateless em `/mcp`; `projectos.list_skills`/`projectos.get_skill`; manifests e instruções fixos validados; `/api/health`; Bearer token por comparação constante; smoke MCP end-to-end.
+- **Evidência local:** `npm ci`, typecheck, build e `npm test` aprovados em 2026-10-09. O smoke cobre health, initialize, tools/list, list/get, 401 e path traversal. Evidência remota ficará registrada após o novo CI.
+- **Limitações:** token compartilhado apenas para piloto pessoal, não é OAuth. O Blueprint F0 citado está ausente. Não há URL pública, projeto Vercel, segredo configurado ou teste remoto; F2 não pode ser concluída antes desses itens.
+- **Atividades:** Streamable HTTP, autenticação, health check, catálogo validado, CI reproduzível e preparação de preview.
 - **Aceite:** Endpoint responde; autenticação aprovada; acessos indevidos bloqueados.
 
 ### F3 — Compatibilidade
@@ -61,6 +61,7 @@ Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para pro
 Após cada fase ou marco relevante, registrar data, evidências verificáveis (commit, PR, workflow), testes, bloqueios e próxima ação. Não marcar fase concluída sem aceite verificável.
 
 ## Histórico
+- 2026-10-09 — v1.7: implementação F2 auditada e corrigida; catálogo passou a carregar/validar manifestos e instruções versionados, nomes de tools alinhados ao contrato, lockfile e smoke MCP adicionados; preview Vercel ainda pendente.
 - 2026-10-09 — v1.6: F2 iniciou em branch isolada. MCP stateless, duas tools, healthcheck e token Bearer implementados; compilação inicial aprovada; preview e autenticação ponta a ponta pendentes.
 - 2026-10-09 — v1.5: F1 concluída; PR #1 integrado, lockfile versionado e CI final aprovado. Próxima etapa F2, ainda não iniciada.
 - 2026-10-09 — v1.4: repositório GitHub conectado e fundação F1 publicada na `main`; workflow acionado; F1 permanece aberta.
