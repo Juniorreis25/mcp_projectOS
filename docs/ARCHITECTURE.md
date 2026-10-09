@@ -10,4 +10,6 @@ Response envelope includes `schema_version`, `request_id`, `status`, `data`, `wa
 
 The catalog is an allowlist of the two versioned skills. Their fixed manifest and instruction resources are parsed and validated at server startup. No request field is used as a filesystem path, and no remote command execution is exposed.
 
+The MCP SDK/JSON-RPC response is the transport envelope. Inside each successful catalog tool result, `structuredContent` and its compatibility `content` carry the ProjectOS Core `Envelope<T>` from `packages/core/contracts.ts`; the catalog DTO remains under `data`. The HTTP request receives a generated `request_id`. HTTP authentication failures and MCP validation failures remain native transport/protocol errors.
+
 The repository currently does not contain the `docs/PROJECTOS_BLUEPRINT_F0.md` referenced by the F0 records. F2 therefore follows the contracts and architecture that are present in `docs/ARCHITECTURE.md`, `packages/core`, and `packages/skills`, without reconstructing the missing approval artifact.

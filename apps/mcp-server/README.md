@@ -14,6 +14,8 @@ Configure `PROJECTOS_MCP_TOKEN` with at least 32 random characters in the runtim
 
 The catalog loads the two fixed, versioned manifests and `SKILL.md` files from the repository and validates them before registering the tools. Tool inputs select from a closed identifier enum; they never become filesystem paths.
 
+Successful tool results place the ProjectOS Core `Envelope<T>` in `structuredContent`, with the existing catalog DTO under `data`. The same envelope is serialized in `content` for clients that do not consume structured content. The MCP/JSON-RPC transport envelope remains separate from this application contract. `DELETE /mcp` is authenticated and returns `401` without a valid token or `405` with `Allow: GET, POST` after authentication; the server exposes no destructive method.
+
 ## Security scope
 A single pre-shared token is a pilot authorization mechanism, not OAuth nor per-user authorization. Production exposure requires a hardened authorization solution, approval, and verification. Workspace files and shell commands are not accessible to this remote server.
 

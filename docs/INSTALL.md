@@ -28,5 +28,7 @@ npm test
 
 `npm test` starts the built server with a test token and checks health, MCP initialization, tool discovery, both catalog operations, authentication rejection, manifest-backed instructions, and path-traversal rejection.
 
+For `/mcp`, missing or invalid Bearer credentials return HTTP `401`. An authenticated `DELETE` is intentionally unsupported and returns `405` with `Allow: GET, POST`; an unauthenticated `DELETE` returns `401`. No destructive MCP method is exposed.
+
 ## Vercel
 Use `apps/mcp-server` as the Vercel Root Directory and set `PROJECTOS_MCP_TOKEN` only in the Preview environment. The token is a personal pilot credential, not OAuth or per-user authorization. The verified preview URL and remote checks are recorded in `PROJECTOS_PLAN.md`; do not promote it to production without explicit approval.
