@@ -27,7 +27,8 @@ const handler = createMcpHandler((server) => {
   }, async ({id}) => {
     const skill = getSkillById(id);
     if (!skill) {
-      return {isError: true, content: [{type: 'text', text: 'Skill not found'}]};
+      const response = envelope(currentRequestId(), 'error', null, {warnings: ['Skill not found']});
+      return {isError: true, content: [{type: 'text', text: JSON.stringify(response)}], structuredContent: response};
     }
     const response = envelope(currentRequestId(), 'ok', {skill});
     return {content: [{type:'text',text:JSON.stringify(response)}], structuredContent: response};
