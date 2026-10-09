@@ -1,5 +1,5 @@
 # ProjectOS — Plano-Mestre de Implementação
-Versão: 1.4 | Atualizado em: 2026-10-09 | Status: F0 concluída; F1 em andamento; F2–F8 não iniciadas
+Versão: 1.5 | Atualizado em: 2026-10-09 | Status: F0 e F1 concluídas; F2 preparada; F3–F8 não iniciadas
 
 ## Objetivo
 Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para projetos novos, existentes e retomadas.
@@ -12,15 +12,15 @@ Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para pro
 - **Evidência:** Documento `docs/PROJECTOS_BLUEPRINT_F0.md` (a incorporar integralmente), aprovação explícita registrada na conversa.
 
 ### F1 — Fundação do repositório
-- **Status:** Em andamento; ainda não concluída.
+- **Status:** Concluída em 2026-10-09.
 - **Critério:** Build limpo, instalação reproduzível, lint, testes aprovados, CI funcional e documentação de instalação.
-- **Evidências:** Código-fonte do monorepo publicado na branch `main` em `4a1befb47fb33f775c0e0df69a78e6999a3c8c38`; testes locais anteriores: 4 aprovados, build/typecheck aprovados.
-- **CI:** [Workflow F1 checks](https://github.com/Juniorreis25/mcp_projectOS/actions/runs/37939849554) **concluído com sucesso** para o commit `4a1befb47fb33f775c0e0df69a78e6999a3c8c38`.
-- **Pendências:** Efetuar instalação limpa com lockfile; implementar lint completo; verificar adaptador MCP/Next.js ou documentar sua transferência deliberada para F2.
-- **Nota:** A rota MCP não está implementada nem publicada. Não confundir fundação com servidor operacional.
+- **Evidências:** [PR #1 integrado](https://github.com/Juniorreis25/mcp_projectOS/pull/1), squash commit `89749afc28cd9b97a45eaa02f61b64984a879eb0`; [CI final aprovado](https://github.com/Juniorreis25/mcp_projectOS/actions/runs/37940609961).
+- **Validações:** lockfile versionado, `npm ci`, lint próprio baseado em AST TypeScript, typecheck estrito, build e quatro testes automatizados no GitHub Actions.
+- **Decisão de escopo:** A fundação contém apenas o diretório e a documentação preparatória do servidor MCP. Implementação efetiva do endpoint Next.js/Streamable HTTP, dependências MCP, autenticação e deploy são entregas F2.
+- **Segurança:** workflow temporário de bootstrap com permissão de escrita foi removido antes da integração.
 
 ### F2 — MCP mínimo na Vercel
-- **Status:** Não iniciada.
+- **Status:** Preparada, não iniciada.
 - **Atividades:** Streamable HTTP, autenticação, health check, list_skills/get_skill, catálogo inicial e preview.
 - **Aceite:** Endpoint responde; autenticação aprovada; acessos indevidos bloqueados.
 
@@ -58,6 +58,7 @@ Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para pro
 Após cada fase ou marco relevante, registrar data, evidências verificáveis (commit, PR, workflow), testes, bloqueios e próxima ação. Não marcar fase concluída sem aceite verificável.
 
 ## Histórico
+- 2026-10-09 — v1.5: F1 concluída; PR #1 integrado, lockfile versionado e CI final aprovado. Próxima etapa F2, ainda não iniciada.
 - 2026-10-09 — v1.4: repositório GitHub conectado e fundação F1 publicada na `main`; workflow acionado; F1 permanece aberta.
 - 2026-10-09 — v1.3: fundação F1 validada localmente; dependências e CI pendentes.
 - 2026-10-09 — v1.2: aprovação expressa da F0.
