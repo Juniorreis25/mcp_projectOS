@@ -1,0 +1,1 @@
+{"name":"projectos","private":true,"version":"0.1.0","type":"module","engines":{"node":">=22"},"scripts":{"typecheck":"tsc -p tsconfig.json --noEmit","build":"tsc -p tsconfig.json","test":"npm run build && node --test tests/*.test.mjs","lint":"node scripts/lint.mjs","check":"npm run lint && npm run typecheck && npm test"},"devDependencies":{"typescript":"5.9.3"}}

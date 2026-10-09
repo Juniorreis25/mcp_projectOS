@@ -1,0 +1,14 @@
+schema_version: '1.0'
+id: projectos.plan
+version: 0.1.0
+title: Planejamento incremental
+summary: Decompõe solicitações em tarefas com dependências e critérios de aceite
+modes: [new, existing, recovery]
+risk_level: moderate
+required_inputs: [goal, project_snapshot]
+outputs: [tasks, dependencies, acceptance_criteria]
+permissions: [project:read]
+approval: none
+execution_location: client
+compatible_interfaces: [mcp_tool, mcp_prompt, mcp_resource]
+references: [SKILL.md]

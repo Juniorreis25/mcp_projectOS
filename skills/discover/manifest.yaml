@@ -1,0 +1,14 @@
+schema_version: '1.0'
+id: projectos.discover
+version: 0.1.0
+title: Descoberta de projeto
+summary: Investiga projetos sem alterar arquivos
+modes: [new, existing, recovery]
+risk_level: low
+required_inputs: [project_snapshot]
+outputs: [architecture_summary, risks, unknowns, recommendations]
+permissions: [project:read]
+approval: none
+execution_location: client
+compatible_interfaces: [mcp_tool, mcp_prompt, mcp_resource]
+references: [SKILL.md]

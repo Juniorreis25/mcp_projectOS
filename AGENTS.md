@@ -1,0 +1,2 @@
+# ProjectOS — Agent Guidance
+Read docs/ARCHITECTURE.md and docs/INSTALL.md before changes. Do not claim unexecuted tests. Do not deploy or alter production without approval. Local code operations belong to authorized client tools. Update PROJECTOS_PLAN.md after verified milestones.

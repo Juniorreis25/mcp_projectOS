@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {envelope} from '../dist/core/contracts.js';
+import {nextState} from '../dist/core/workflow.js';
+import {parseManifest,validateCatalog} from '../dist/skills/manifest.js';
+test('envelope fields and serialization',()=>{const x=envelope('req-1','ok',{fine:true});assert.deepEqual(JSON.parse(JSON.stringify(x)), {schema_version:'1.0',request_id:'req-1',status:'ok',data:{fine:true},warnings:[],evidence_refs:[],required_approvals:[],next_actions:[]});});
+test('completed needs evidence',()=>{assert.throws(()=>nextState('verifying','completed'),/MISSING_EVIDENCE/);assert.equal(nextState('verifying','completed',['test:1']),'completed');});
+test('manifest fixtures valid and unique',()=>{const a=parseManifest(readFileSync('skills/discover/manifest.yaml','utf8'));const b=parseManifest(readFileSync('skills/plan/manifest.yaml','utf8'));validateCatalog([a,b]);assert.equal(a.id,'projectos.discover');});
+test('invalid and conflicting manifests fail',()=>{const s=readFileSync('skills/discover/manifest.yaml','utf8');assert.throws(()=>parseManifest(s.replace('0.1.0','not-a-version')),/INVALID_INPUT/);const a=parseManifest(s);assert.throws(()=>validateCatalog([a,a]),/CONFLICT/);});

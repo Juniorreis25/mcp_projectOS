@@ -1,0 +1,1 @@
+{"compilerOptions":{"target":"ES2022","module":"NodeNext","moduleResolution":"NodeNext","strict":true,"declaration":true,"rootDir":"packages","outDir":"dist","skipLibCheck":true,"noEmitOnError":true},"include":["packages/**/*.ts"]}
