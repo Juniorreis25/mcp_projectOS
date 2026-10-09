@@ -1,5 +1,5 @@
 # ProjectOS — Plano-Mestre de Implementação
-Versão: 2.9 | Atualizado em: 2026-10-09 | Status: F0, F1 e F2 concluídas; F3 iniciada, F3.1 tecnicamente validada, F3.2 não iniciada; F4–F8 não iniciadas
+Versão: 3.0 | Atualizado em: 2026-10-09 | Status: F0, F1 e F2 concluídas; F3 iniciada, F3.1 tecnicamente validada, F3.2 não iniciada; F4–F8 não iniciadas
 
 ## Objetivo
 Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para projetos novos, existentes e retomadas.
@@ -107,3 +107,10 @@ Após cada fase ou marco relevante, registrar data, evidências verificáveis (c
 - Agente integrado ao VS Code: ferramentas ainda indisponíveis; validação de invocação pendente.
 - Erros OAuth do Supabase e avisos de hooks Stop não bloquearam a chamada CLI do ProjectOS.
 - **Fonte:** logs fornecidos pelo operador, não reexecutados nesta sessão. Relatório: [docs/f3/f3.2-vscode-codex.md](docs/f3/f3.2-vscode-codex.md).
+
+## Atualização de validação — F3.2 (2026-10-09)
+- Codex integrado ao VS Code: **tecnicamente validado conforme relato do operador**, com três chamadas reais reportadas; `projectos_list_skills` e duas chamadas `projectos_get_skill`.
+- Skills: `projectos.discover` e `projectos.plan`, versão `0.1.0`. Envelope Core `1.0`, status `ok`, request IDs distintos: `c1a7f542-2896-4267-8d0b-6aa0fde55526`, `b2b45155-cd50-4470-8ba2-bf80e5fe9e87`, `4e9ed10c-c96b-4802-9288-8f9864056879`.
+- Nenhuma escrita ou vazamento de credencial foi relatado. Evidências não reexecutadas nesta sessão.
+- **F3:** aceite funcional F3.1/F3.2 documentado; permanece aberta para conferência e integração dos PRs #3 e #4, sem antecipar merge.
+- Documento: `docs/f3/f3.2-vscode-codex.md`.
