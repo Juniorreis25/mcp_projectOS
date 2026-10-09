@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { timingSafeEqual } from 'node:crypto';
 import { skillCatalog, getSkillById } from '../../lib/catalog';
 import { envelope } from '../../../../packages/core/contracts';
+import { startWorkflow, type StartWorkflowInput } from '../../../../packages/core/universal-flow';
 import { currentRequestId, runWithRequestId } from '../../lib/request-context';
 
 export const runtime = 'nodejs';
@@ -22,7 +23,7 @@ const handler = createMcpHandler((server) => {
   server.registerTool('projectos_get_skill', {
     title: 'Get ProjectOS skill',
     description: 'Read a versioned ProjectOS skill definition and instructions.',
-    inputSchema: z.object({id: z.enum(['projectos.discover','projectos.plan'])}).strict(),
+    inputSchema: z.object({id: z.enum(['projectos.discover','projectos.plan','projectos.start'])}).strict(),
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   }, async ({id}) => {
     const skill = getSkillById(id);
@@ -32,6 +33,52 @@ const handler = createMcpHandler((server) => {
     }
     const response = envelope(currentRequestId(), 'ok', {skill});
     return {content: [{type:'text',text:JSON.stringify(response)}], structuredContent: response};
+  });
+
+  server.registerTool('projectos_start_workflow', {
+    title: 'Start ProjectOS workflow',
+    description: 'Select a project mode and produce a read-only, evidence-backed workflow proposal.',
+    inputSchema: z.object({
+      project_id: z.string().trim().min(1).max(120).optional(),
+      requested_mode: z.enum(['new', 'existing', 'recovery']).optional(),
+      goal: z.string().trim().min(1).max(2000).optional(),
+      scope: z.array(z.string().trim().min(1).max(500)).max(50).optional(),
+      constraints: z.array(z.string().trim().min(1).max(500)).max(50).optional(),
+      priority_requirements: z.array(z.string().trim().min(1).max(500)).max(50).optional(),
+      project_snapshot: z.object({
+        structure: z.array(z.string().trim().min(1).max(500)).max(500).optional(),
+        config_files: z.array(z.string().trim().min(1).max(500)).max(200).optional(),
+        technologies: z.array(z.string().trim().min(1).max(200)).max(100).optional(),
+        documentation: z.array(z.string().trim().min(1).max(500)).max(200).optional(),
+        git_status: z.string().trim().max(5000).optional(),
+        tests: z.array(z.string().trim().min(1).max(500)).max(200).optional(),
+        risks: z.array(z.string().trim().min(1).max(500)).max(100).optional(),
+      }).strict().optional(),
+      recovery: z.object({
+        original_goal: z.string().trim().min(1).max(2000).optional(),
+        last_known_state: z.string().trim().min(1).max(2000).optional(),
+        pending_changes: z.array(z.string().trim().min(1).max(500)).max(100).optional(),
+        previous_decisions: z.array(z.string().trim().min(1).max(500)).max(100).optional(),
+        incomplete_work: z.array(z.string().trim().min(1).max(500)).max(100).optional(),
+        blockers: z.array(z.string().trim().min(1).max(500)).max(100).optional(),
+        next_steps: z.array(z.string().trim().min(1).max(500)).max(100).optional(),
+      }).strict().optional(),
+      evidence: z.array(z.object({
+        ref: z.string().trim().min(1).max(300),
+        summary: z.string().trim().min(1).max(2000),
+      }).strict()).max(100).optional(),
+      requested_operations: z.array(z.string().trim().min(1).max(300)).max(50).optional(),
+      approvals: z.array(z.string().trim().min(1).max(300)).max(50).optional(),
+    }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  }, async (input) => {
+    const result = startWorkflow(input as StartWorkflowInput);
+    const response = envelope(currentRequestId(), result.status, result.proposal, {
+      evidence_refs: result.proposal.evidence_refs,
+      required_approvals: result.proposal.required_approvals,
+      next_actions: result.proposal.next_actions,
+    });
+    return {content: [{type: 'text', text: JSON.stringify(response)}], structuredContent: response};
   });
 }, {serverInfo: {name: 'ProjectOS MCP', version: '0.2.0'}});
 

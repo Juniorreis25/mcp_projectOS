@@ -1,0 +1,14 @@
+schema_version: '1.0'
+id: projectos.start
+version: 0.1.0
+title: Fluxo universal de projeto
+summary: Identifica o modo de projeto e produz uma proposta segura baseada em evidências
+modes: [new, existing, recovery]
+risk_level: moderate
+required_inputs: [project_context, client_evidence]
+outputs: [selected_mode, workflow_proposal, risk_assessment, required_approvals, next_actions]
+permissions: [project:read]
+approval: explicit
+execution_location: client
+compatible_interfaces: [mcp_tool, mcp_prompt, mcp_resource]
+references: [SKILL.md]
