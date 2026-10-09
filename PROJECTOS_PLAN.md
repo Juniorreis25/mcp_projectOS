@@ -1,5 +1,5 @@
 # ProjectOS — Plano-Mestre de Implementação
-Versão: 1.5 | Atualizado em: 2026-10-09 | Status: F0 e F1 concluídas; F2 preparada; F3–F8 não iniciadas
+Versão: 1.6 | Atualizado em: 2026-10-09 | Status: F0 e F1 concluídas; F2 em andamento; F3–F8 não iniciadas
 
 ## Objetivo
 Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para projetos novos, existentes e retomadas.
@@ -20,7 +20,10 @@ Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para pro
 - **Segurança:** workflow temporário de bootstrap com permissão de escrita foi removido antes da integração.
 
 ### F2 — MCP mínimo na Vercel
-- **Status:** Preparada, não iniciada.
+- **Status:** Em andamento; implementação em branch `f2/mcp-remote-preview`, sem deploy confirmado.
+- **Implementado:** Next.js App Router com `mcp-handler` v2 e Streamable HTTP stateless em `/mcp`; list_skills/get_skill para discover e plan; `/api/health`; verificação de token Bearer por comparação constante.
+- **Evidência:** [CI build inicial aprovado](https://github.com/Juniorreis25/mcp_projectOS/actions/runs/37941420761). Novo smoke test HTTP incluído, execução pendente.
+- **Limitações:** token compartilhado apenas para piloto pessoal, não é OAuth. Não foi criado projeto Vercel; não há URL pública, configuração de segredo ou teste de invocação autenticada comprovado. Etapa não concluída.
 - **Atividades:** Streamable HTTP, autenticação, health check, list_skills/get_skill, catálogo inicial e preview.
 - **Aceite:** Endpoint responde; autenticação aprovada; acessos indevidos bloqueados.
 
@@ -58,6 +61,7 @@ Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para pro
 Após cada fase ou marco relevante, registrar data, evidências verificáveis (commit, PR, workflow), testes, bloqueios e próxima ação. Não marcar fase concluída sem aceite verificável.
 
 ## Histórico
+- 2026-10-09 — v1.6: F2 iniciou em branch isolada. MCP stateless, duas tools, healthcheck e token Bearer implementados; compilação inicial aprovada; preview e autenticação ponta a ponta pendentes.
 - 2026-10-09 — v1.5: F1 concluída; PR #1 integrado, lockfile versionado e CI final aprovado. Próxima etapa F2, ainda não iniciada.
 - 2026-10-09 — v1.4: repositório GitHub conectado e fundação F1 publicada na `main`; workflow acionado; F1 permanece aberta.
 - 2026-10-09 — v1.3: fundação F1 validada localmente; dependências e CI pendentes.
