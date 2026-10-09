@@ -1,5 +1,5 @@
 # ProjectOS — Plano-Mestre de Implementação
-Versão: 1.7 | Atualizado em: 2026-10-09 | Status: F0 e F1 concluídas; F2 em andamento; F3–F8 não iniciadas
+Versão: 1.8 | Atualizado em: 2026-10-09 | Status: F0 e F1 concluídas; F2 em andamento; F3–F8 não iniciadas
 
 ## Objetivo
 Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para projetos novos, existentes e retomadas.
@@ -22,8 +22,8 @@ Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para pro
 ### F2 — MCP mínimo na Vercel
 - **Status:** Em andamento; implementação publicada em `f2/mcp-remote-preview` no PR #2. O código foi desenvolvido localmente em `codex/f2-mcp-server`; não houve merge nem deploy de produção.
 - **Implementado:** Next.js 16.4.0, `mcp-handler` 2.3.0, SDK MCP 2.3.1, Streamable HTTP stateless em `/mcp`; `projectos.list_skills`/`projectos.get_skill`; manifests e instruções fixos validados; `/api/health`; Bearer token por comparação constante; smoke MCP end-to-end.
-- **Evidência local:** `npm ci`, typecheck, build e `npm test` aprovados em 2026-10-09. O smoke cobre health, initialize, tools/list, list/get, 401 e path traversal. [F1 checks #18](https://github.com/Juniorreis25/mcp_projectOS/actions/runs/37944079872) e [F2 MCP checks #10](https://github.com/Juniorreis25/mcp_projectOS/actions/runs/37944080228) concluíram com sucesso para o commit `7554f14465ab90c5eecaee5955655ed74fd3701b`.
-- **Evidência Vercel:** projeto `projectos-mcp` criado no time `Junior's projects`; preview READY no commit `7554f14`, URL [projectos-mcp-git-f2-mcp-remot-a3cde6-juniors-projects-21c34634.vercel.app](https://projectos-mcp-git-f2-mcp-remot-a3cde6-juniors-projects-21c34634.vercel.app). Teste remoto em 2026-10-09: health 200, sem token 401, initialize 200, tools/list com as duas ferramentas e get_skill autenticado 200. A proteção Vercel foi acessada por link temporário de automação; o token da aplicação continuou obrigatório.
+- **Evidência local:** `npm ci`, typecheck, build e `npm test` aprovados em 2026-10-09. O smoke cobre health, initialize, tools/list, list/get, 401 e path traversal. [F1 checks #19](https://github.com/Juniorreis25/mcp_projectOS/actions/runs/37944843651) e [F2 MCP checks #12](https://github.com/Juniorreis25/mcp_projectOS/actions/runs/37944843235) concluíram com sucesso para o commit `d15b23c0afead6a48c1ae0465070d6e268f388be`.
+- **Evidência Vercel:** projeto `projectos-mcp` criado no time `Junior's projects`; preview READY no commit `d15b23c`, URL [projectos-mcp-git-f2-mcp-remot-a3cde6-juniors-projects-21c34634.vercel.app](https://projectos-mcp-git-f2-mcp-remot-a3cde6-juniors-projects-21c34634.vercel.app). Teste remoto em 2026-10-09: health 200, sem token 401, initialize 200, tools/list com as duas ferramentas e get_skill autenticado 200. A proteção Vercel foi acessada por link temporário de automação; o token da aplicação continuou obrigatório.
 - **Limitações:** token compartilhado apenas para piloto pessoal, não é OAuth. O Blueprint F0 citado está ausente. Não houve merge nem deploy de produção. F2 permanece em andamento até revisão/aprovação aplicável e fechamento explícito dos critérios.
 - **Atividades:** Streamable HTTP, autenticação, health check, catálogo validado, CI reproduzível e preparação de preview.
 - **Aceite:** Endpoint responde; autenticação aprovada; acessos indevidos bloqueados.
