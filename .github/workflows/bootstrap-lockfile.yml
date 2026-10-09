@@ -1,6 +1,8 @@
 name: Bootstrap F1 lockfile
 on:
   workflow_dispatch:
+  push:
+    branches: ['f1/reproducible-build-and-quality']
 permissions:
   contents: write
 jobs:
