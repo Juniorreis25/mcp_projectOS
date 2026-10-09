@@ -1,7 +1,7 @@
 import { createMcpHandler } from 'mcp-handler';
 import { z } from 'zod';
 import { timingSafeEqual } from 'node:crypto';
-import { skillCatalog, getSkillById } from '../../../lib/catalog';
+import { skillCatalog, getSkillById } from '../../lib/catalog';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
