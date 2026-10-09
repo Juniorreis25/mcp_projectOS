@@ -6,7 +6,7 @@ Sistema pessoal de desenvolvimento assistido por IA, distribuído por um servido
 
 - F0: concluída e aprovada em 2026-10-09.
 - F1: concluída em 2026-10-09.
-- F2: em andamento; servidor, CI e preview Vercel validados; revisão/aceite pendentes.
+- F2: concluída tecnicamente; servidor, CI e preview Vercel validados; PR #2 permanece draft sem merge/produção.
 - F3–F8: não iniciadas.
 
 Consulte `PROJECTOS_PLAN.md` para acompanhar o planejamento. O Blueprint F0 citado pelos registros ainda não está presente no repositório; os contratos disponíveis estão em `docs/ARCHITECTURE.md`, `packages/core` e `packages/skills`.

@@ -13,9 +13,9 @@ The Next.js/Streamable HTTP MCP endpoint, MCP SDK/mcp-handler dependencies, OAut
 - The initial F2 branch was audited against the repository tree and official `mcp-handler`, MCP SDK, and Next.js documentation.
 - The MCP app now has its own lockfile, fixed manifest-backed catalog loading, closed tool identifiers, bearer-token rejection tests, and a local end-to-end smoke test.
 - The F0 Blueprint file referenced by the plan is absent from the repository; no missing decisions were invented.
-- CI, preview deployment, preview secret configuration, and remote endpoint validation are now verified. Remaining blockers are review/approval of the pilot authentication model and the explicit decision to merge; production deployment remains out of scope.
+- CI, preview deployment, preview secret configuration, and remote endpoint validation are verified; F2 is technically complete. The PR remains draft pending the explicit merge decision, and production deployment remains out of scope.
 
 ## Follow-up
-- Merge F1 PR after CI passes for the final commit.
-- Synchronize the master plan.
-- During F2 verify exact Next.js and mcp-handler versions, authentication, integration tests, and a preview deployment.
+- Review PR #2 and decide whether to merge it; keep production deployment disabled.
+- Keep the pilot token limitation explicit until an OAuth/per-user authorization design is approved.
+- Prepare F3 client-compatibility work without starting it automatically.
