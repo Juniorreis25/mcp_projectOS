@@ -2,7 +2,7 @@ name: F1 checks
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, 'f1/**']
 permissions:
   contents: read
 jobs:
@@ -13,5 +13,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm install --no-save typescript@5.9.3
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
       - run: npm run check
