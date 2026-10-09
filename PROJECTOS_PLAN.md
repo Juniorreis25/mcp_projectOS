@@ -1,5 +1,5 @@
 # ProjectOS — Plano-Mestre de Implementação
-Versão: 2.7 | Atualizado em: 2026-10-09 | Status: F0, F1 e F2 concluídas; F3 iniciada, F3.1 tecnicamente validada, F3.2 não iniciada; F4–F8 não iniciadas
+Versão: 3.0 | Atualizado em: 2026-10-09 | Status: F0, F1 e F2 concluídas; F3 iniciada, F3.1 tecnicamente validada, F3.2 não iniciada; F4–F8 não iniciadas
 
 ## Objetivo
 Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para projetos novos, existentes e retomadas.
@@ -93,3 +93,24 @@ Após cada fase ou marco relevante, registrar data, evidências verificáveis (c
 - 2026-10-09 — v1.2: aprovação expressa da F0.
 - 2026-10-09 — v1.1: Blueprint enviado para aprovação.
 - 2026-10-09 — v1.0: planejamento inicial.
+
+## F3.2 — Achado VS Code (2026-10-09)
+- O VS Code conseguiu conectar ao MCP (`Running`) e descobrir duas tools, mas rejeitou nomes com ponto: `projectos.list_skills`, `projectos.get_skill`.
+- Correção proposta na branch `fix/f3-vscode-tool-names`: renomear apenas tools para `projectos_list_skills` e `projectos_get_skill`, preservando os IDs de skills `projectos.discover` e `projectos.plan`.
+- Smoke automatizado adaptado para verificar ambos os nomes com regex `^[a-z0-9_-]+$`.
+- F3.2 permanece em andamento. Após merge e novo preview da Vercel, repetir teste no VS Code com URL do deployment mais recente. Não divulgar tokens.
+
+## Atualização F3.2 — Evidência Codex CLI (2026-10-09)
+- **Status:** F3.2 parcialmente validada; F3 aberta.
+- VS Code MCP Extension Host: conexão Running e descoberta de 2 tools, sem novos avisos de nomes inválidos.
+- Codex CLI 0.162.0: três chamadas reais reportadas com sucesso (`projectos_list_skills`, `projectos_get_skill` discover e plan); Core `1.0`, status `ok`, versões `0.1.0` e request_ids distintos: `9c887e9e-79a2-42b8-b483-789530ce69e3`, `2ea62feb-f84c-4e00-a8bd-eccf6c022ba3`, `2e10ba4c-921b-41bd-b206-e2cddbde2046`.
+- Agente integrado ao VS Code: ferramentas ainda indisponíveis; validação de invocação pendente.
+- Erros OAuth do Supabase e avisos de hooks Stop não bloquearam a chamada CLI do ProjectOS.
+- **Fonte:** logs fornecidos pelo operador, não reexecutados nesta sessão. Relatório: [docs/f3/f3.2-vscode-codex.md](docs/f3/f3.2-vscode-codex.md).
+
+## Atualização de validação — F3.2 (2026-10-09)
+- Codex integrado ao VS Code: **tecnicamente validado conforme relato do operador**, com três chamadas reais reportadas; `projectos_list_skills` e duas chamadas `projectos_get_skill`.
+- Skills: `projectos.discover` e `projectos.plan`, versão `0.1.0`. Envelope Core `1.0`, status `ok`, request IDs distintos: `c1a7f542-2896-4267-8d0b-6aa0fde55526`, `b2b45155-cd50-4470-8ba2-bf80e5fe9e87`, `4e9ed10c-c96b-4802-9288-8f9864056879`.
+- Nenhuma escrita ou vazamento de credencial foi relatado. Evidências não reexecutadas nesta sessão.
+- **F3:** aceite funcional F3.1/F3.2 documentado; permanece aberta para conferência e integração dos PRs #3 e #4, sem antecipar merge.
+- Documento: `docs/f3/f3.2-vscode-codex.md`.

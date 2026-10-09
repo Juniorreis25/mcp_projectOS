@@ -97,16 +97,17 @@ try {
 
   const tools = await mcp('tools/list', {});
   assert.equal(tools.response.status, 200);
-  assert.deepEqual(tools.body.result.tools.map(tool => tool.name).sort(), ['projectos.get_skill', 'projectos.list_skills']);
+  assert.deepEqual(tools.body.result.tools.map(tool => tool.name).sort(), ['projectos_get_skill', 'projectos_list_skills']);
+  for (const tool of tools.body.result.tools) assert.match(tool.name, /^[a-z0-9_-]+$/);
 
-  const listed = await mcp('tools/call', {name: 'projectos.list_skills', arguments: {}});
+  const listed = await mcp('tools/call', {name: 'projectos_list_skills', arguments: {}});
   assert.equal(listed.response.status, 200);
   const listedEnvelope = listed.body.result.structuredContent;
   assertEnvelope(listedEnvelope);
   assert.equal(listedEnvelope.data.skills.length, 2);
   assert.equal(listed.body.result.content[0].text, JSON.stringify(listedEnvelope));
 
-  const skill = await mcp('tools/call', {name: 'projectos.get_skill', arguments: {id: 'projectos.discover'}});
+  const skill = await mcp('tools/call', {name: 'projectos_get_skill', arguments: {id: 'projectos.discover'}});
   assert.equal(skill.response.status, 200);
   const discoverEnvelope = skill.body.result.structuredContent;
   assertEnvelope(discoverEnvelope);
@@ -118,7 +119,7 @@ try {
   assert.equal(skill.body.result.content[0].text, JSON.stringify(discoverEnvelope));
   assert.notEqual(listedEnvelope.request_id, discoverEnvelope.request_id);
 
-  const plan = await mcp('tools/call', {name: 'projectos.get_skill', arguments: {id: 'projectos.plan'}});
+  const plan = await mcp('tools/call', {name: 'projectos_get_skill', arguments: {id: 'projectos.plan'}});
   assert.equal(plan.response.status, 200);
   const planEnvelope = plan.body.result.structuredContent;
   assertEnvelope(planEnvelope);
@@ -128,7 +129,7 @@ try {
   assert.match(planEnvelope.data.skill.instructions, /incremental tasks|dependencies|evidence/i);
   assert.deepEqual(planEnvelope.data.skill.resources, ['manifest.yaml', 'SKILL.md']);
 
-  const invalid = await mcp('tools/call', {name: 'projectos.get_skill', arguments: {id: '../../package.json'}});
+  const invalid = await mcp('tools/call', {name: 'projectos_get_skill', arguments: {id: '../../package.json'}});
   assert.equal(invalid.response.status, 200);
   assert.equal(invalid.body.result.isError, true);
   assert.match(invalid.body.result.content[0].text, /Invalid arguments/);
