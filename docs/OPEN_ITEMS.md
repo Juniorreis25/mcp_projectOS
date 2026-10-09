@@ -13,10 +13,11 @@ The Next.js/Streamable HTTP MCP endpoint, MCP SDK/mcp-handler dependencies, OAut
 - The initial F2 branch was audited against the repository tree and official `mcp-handler`, MCP SDK, and Next.js documentation.
 - The MCP app now has its own lockfile, fixed manifest-backed catalog loading, closed tool identifiers, bearer-token rejection tests, and a local end-to-end smoke test.
 - The F0 Blueprint file referenced by the plan is absent from the repository; no missing decisions were invented.
-- CI, preview deployment, preview secret configuration, and remote endpoint validation are verified. Final review identified a Core envelope mismatch, an unauthenticated DELETE rejection path, and missing direct coverage for projectos.plan; F2 is not approved for merge until these points are resolved or explicitly reconciled. Production deployment remains out of scope.
+- The Core envelope mismatch, unauthenticated DELETE rejection path, and missing direct projectos.plan coverage were corrected in commit `febb060`. Local tests, CI, preview deployment, preview secret configuration, and remote endpoint validation for the correction are verified. F2 remains under Orchestrator review; production deployment remains out of scope.
 
 ## Follow-up
 - Review PR #2 and decide whether to merge it; keep production deployment disabled.
-- Resolve the MCP/Core response-envelope boundary, align DELETE authentication behavior, and add direct projectos.plan coverage before approving merge.
+- Decide whether to approve merge of PR #2; keep production deployment disabled.
 - Keep the pilot token limitation explicit until an OAuth/per-user authorization design is approved.
+- Schedule rate limiting, full YAML parsing, and Actions SHA pinning as later hardening work if production exposure is approved.
 - Prepare F3 client-compatibility work without starting it automatically.
