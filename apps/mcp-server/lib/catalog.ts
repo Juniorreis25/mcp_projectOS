@@ -10,6 +10,10 @@ const skillSources = {
     manifest: new URL('../../../skills/plan/manifest.yaml', import.meta.url),
     instructions: new URL('../../../skills/plan/SKILL.md', import.meta.url),
   },
+  'projectos.start': {
+    manifest: new URL('../../../skills/start/manifest.yaml', import.meta.url),
+    instructions: new URL('../../../skills/start/SKILL.md', import.meta.url),
+  },
 } as const;
 
 export type SkillId = keyof typeof skillSources;
