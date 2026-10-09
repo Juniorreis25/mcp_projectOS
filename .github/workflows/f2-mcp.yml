@@ -19,3 +19,15 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npm run typecheck
       - run: npm run build
+      - name: Smoke test health and unauthorized MCP
+        run: |
+          npm run start -- --port 3100 > /tmp/projectos-next.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3100/api/health > /tmp/projectos-health.json; then break; fi
+            sleep 2
+          done
+          grep -q '"status":"ok"' /tmp/projectos-health.json
+          HTTP_CODE="$(curl -s -o /tmp/projectos-denied.json -w '%{http_code}' -X POST http://127.0.0.1:3100/mcp -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}')"
+          test "$HTTP_CODE" = "401"
