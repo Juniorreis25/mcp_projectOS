@@ -22,8 +22,8 @@ Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para pro
 ### F2 — MCP mínimo na Vercel
 - **Status:** Em andamento; implementação em branch `f2/mcp-remote-preview`, sem deploy confirmado.
 - **Implementado:** Next.js App Router com `mcp-handler` v2 e Streamable HTTP stateless em `/mcp`; list_skills/get_skill para discover e plan; `/api/health`; verificação de token Bearer por comparação constante.
-- **Evidência:** [CI build inicial aprovado](https://github.com/Juniorreis25/mcp_projectOS/actions/runs/37941420761). Novo smoke test HTTP incluído, execução pendente.
-- **Limitações:** token compartilhado apenas para piloto pessoal, não é OAuth. Não foi criado projeto Vercel; não há URL pública, configuração de segredo ou teste de invocação autenticada comprovado. Etapa não concluída.
+- **Evidência:** [CI build inicial aprovado](https://github.com/Juniorreis25/mcp_projectOS/actions/runs/37941420761). [Smoke HTTP autenticado aprovado](https://github.com/Juniorreis25/mcp_projectOS/actions/runs/37941702593): health check, rejeição 401 sem token e descoberta `tools/list` autenticada com duas ferramentas.
+- **Limitações:** token compartilhado apenas para piloto pessoal, não é OAuth. Não foi criado projeto Vercel; não há URL pública nem configuração de segredo. Invocação autenticada foi comprovada apenas em CI local, não na Vercel. Etapa não concluída.
 - **Atividades:** Streamable HTTP, autenticação, health check, list_skills/get_skill, catálogo inicial e preview.
 - **Aceite:** Endpoint responde; autenticação aprovada; acessos indevidos bloqueados.
 
