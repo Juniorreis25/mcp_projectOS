@@ -1,5 +1,5 @@
 # ProjectOS — Plano-Mestre de Implementação
-Versão: 2.8 | Atualizado em: 2026-10-09 | Status: F0, F1 e F2 concluídas; F3 iniciada, F3.1 tecnicamente validada, F3.2 não iniciada; F4–F8 não iniciadas
+Versão: 2.9 | Atualizado em: 2026-10-09 | Status: F0, F1 e F2 concluídas; F3 iniciada, F3.1 tecnicamente validada, F3.2 não iniciada; F4–F8 não iniciadas
 
 ## Objetivo
 Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para projetos novos, existentes e retomadas.
@@ -99,3 +99,11 @@ Após cada fase ou marco relevante, registrar data, evidências verificáveis (c
 - Correção proposta na branch `fix/f3-vscode-tool-names`: renomear apenas tools para `projectos_list_skills` e `projectos_get_skill`, preservando os IDs de skills `projectos.discover` e `projectos.plan`.
 - Smoke automatizado adaptado para verificar ambos os nomes com regex `^[a-z0-9_-]+$`.
 - F3.2 permanece em andamento. Após merge e novo preview da Vercel, repetir teste no VS Code com URL do deployment mais recente. Não divulgar tokens.
+
+## Atualização F3.2 — Evidência Codex CLI (2026-10-09)
+- **Status:** F3.2 parcialmente validada; F3 aberta.
+- VS Code MCP Extension Host: conexão Running e descoberta de 2 tools, sem novos avisos de nomes inválidos.
+- Codex CLI 0.162.0: três chamadas reais reportadas com sucesso (`projectos_list_skills`, `projectos_get_skill` discover e plan); Core `1.0`, status `ok`, versões `0.1.0` e request_ids distintos: `9c887e9e-79a2-42b8-b483-789530ce69e3`, `2ea62feb-f84c-4e00-a8bd-eccf6c022ba3`, `2e10ba4c-921b-41bd-b206-e2cddbde2046`.
+- Agente integrado ao VS Code: ferramentas ainda indisponíveis; validação de invocação pendente.
+- Erros OAuth do Supabase e avisos de hooks Stop não bloquearam a chamada CLI do ProjectOS.
+- **Fonte:** logs fornecidos pelo operador, não reexecutados nesta sessão. Relatório: [docs/f3/f3.2-vscode-codex.md](docs/f3/f3.2-vscode-codex.md).
