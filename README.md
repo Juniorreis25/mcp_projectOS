@@ -5,10 +5,11 @@ Sistema pessoal de desenvolvimento assistido por IA, distribuído por um servido
 ## Estado
 
 - F0: concluída e aprovada em 2026-10-09.
-- F1: em andamento (fundação local elaborada; publicação integral, dependências e CI pendentes).
-- F2–F8: não iniciadas.
+- F1: concluída em 2026-10-09.
+- F2: corrigida e validada; envelope Core, DELETE, cobertura de plan, CI e novo preview verificados; aguarda decisão do Orquestrador antes do merge.
+- F3–F8: não iniciadas.
 
-Consulte `PROJECTOS_PLAN.md` para acompanhar o planejamento. A arquitetura e os contratos estão em `docs/PROJECTOS_BLUEPRINT_F0.md`.
+Consulte `PROJECTOS_PLAN.md` para acompanhar o planejamento. O Blueprint F0 citado pelos registros ainda não está presente no repositório; os contratos disponíveis estão em `docs/ARCHITECTURE.md`, `packages/core` e `packages/skills`.
 
 ## Princípios
 
