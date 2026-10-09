@@ -1,5 +1,5 @@
 # ProjectOS — Plano-Mestre de Implementação
-Versão: 2.7 | Atualizado em: 2026-10-09 | Status: F0, F1 e F2 concluídas; F3 iniciada, F3.1 tecnicamente validada, F3.2 não iniciada; F4–F8 não iniciadas
+Versão: 2.8 | Atualizado em: 2026-10-09 | Status: F0, F1 e F2 concluídas; F3 iniciada, F3.1 tecnicamente validada, F3.2 não iniciada; F4–F8 não iniciadas
 
 ## Objetivo
 Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para projetos novos, existentes e retomadas.
@@ -93,3 +93,9 @@ Após cada fase ou marco relevante, registrar data, evidências verificáveis (c
 - 2026-10-09 — v1.2: aprovação expressa da F0.
 - 2026-10-09 — v1.1: Blueprint enviado para aprovação.
 - 2026-10-09 — v1.0: planejamento inicial.
+
+## F3.2 — Achado VS Code (2026-10-09)
+- O VS Code conseguiu conectar ao MCP (`Running`) e descobrir duas tools, mas rejeitou nomes com ponto: `projectos.list_skills`, `projectos.get_skill`.
+- Correção proposta na branch `fix/f3-vscode-tool-names`: renomear apenas tools para `projectos_list_skills` e `projectos_get_skill`, preservando os IDs de skills `projectos.discover` e `projectos.plan`.
+- Smoke automatizado adaptado para verificar ambos os nomes com regex `^[a-z0-9_-]+$`.
+- F3.2 permanece em andamento. Após merge e novo preview da Vercel, repetir teste no VS Code com URL do deployment mais recente. Não divulgar tokens.
