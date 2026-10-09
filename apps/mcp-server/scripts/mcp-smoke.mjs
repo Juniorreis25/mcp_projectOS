@@ -178,6 +178,44 @@ try {
   assert.equal(invalid.response.status, 200);
   assert.equal(invalid.body.result.isError, true);
   assert.match(invalid.body.result.content[0].text, /Invalid arguments/);
+
+  const needsInput = await mcp('tools/call', {
+    name: 'projectos_start_workflow',
+    arguments: {requested_mode: 'new', evidence: [{ref: 'smoke:missing-goal', summary: 'Context without a goal'}]},
+  });
+  assert.equal(needsInput.response.status, 200);
+  assertEnvelope(needsInput.body.result.structuredContent, 'needs_input', ['smoke:missing-goal'], [], true);
+  assert.equal(needsInput.body.result.structuredContent.data.state, 'draft');
+
+  const unilateralApproval = await mcp('tools/call', {
+    name: 'projectos_start_workflow',
+    arguments: {
+      project_id: 'smoke-project',
+      requested_mode: 'existing',
+      project_snapshot: {structure: ['src/']},
+      evidence: [{ref: 'smoke:approval', summary: 'Authorized client evidence'}],
+      requested_operations: ['overwrite files'],
+      approvals: ['human:approve:overwrite files'],
+    },
+  });
+  assert.equal(unilateralApproval.response.status, 200);
+  assertEnvelope(unilateralApproval.body.result.structuredContent, 'blocked', ['smoke:approval'], ['human:approve:overwrite files'], true);
+
+  const unexpectedField = await mcp('tools/call', {
+    name: 'projectos_start_workflow',
+    arguments: {goal: 'Strict input', evidence: [{ref: 'smoke:strict', summary: 'Strict schema evidence'}], unexpected: true},
+  });
+  assert.equal(unexpectedField.response.status, 200);
+  assert.equal(unexpectedField.body.result.isError, true);
+  assert.match(unexpectedField.body.result.content[0].text, /Invalid arguments/);
+
+  const oversizedInput = await mcp('tools/call', {
+    name: 'projectos_start_workflow',
+    arguments: {goal: 'Bounded input', evidence: [{ref: 'smoke:bounded', summary: 'Bounded schema evidence'}], scope: Array.from({length: 51}, (_, index) => `item-${index}`)},
+  });
+  assert.equal(oversizedInput.response.status, 200);
+  assert.equal(oversizedInput.body.result.isError, true);
+  assert.match(oversizedInput.body.result.content[0].text, /Invalid arguments/);
 } finally {
   await new Promise(resolve => {
     if (server.exitCode !== null) {

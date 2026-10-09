@@ -67,6 +67,23 @@ Os testes Core cobrem:
 
 O smoke MCP cobre catálogo com três skills, descoberta das três tools, `projectos.start`, envelope, request IDs, proposta válida e resposta `blocked` para deploy.
 
+## Revisão de segurança e homologação — 2026-10-09
+
+A comparação contra `main` (`fbd25464c80e0ace653ec7dd6746a43901b4ac0b`) confirmou que a alteração adiciona apenas a skill, a tool, o fluxo Core, testes e documentação F4. O servidor não recebe acesso ao workspace do cliente e não contém primitivas de shell, escrita, migração ou deploy.
+
+Os testes adversariais locais cobrem objetivo ausente, contexto contraditório, snapshot vazio, sobrescrita, recuperação incompleta, migração/deploy, IDs vazios via schema MCP, campos inesperados, limites de tamanho, texto de prompt injection como dado inerte, isolamento por `project_id` e `approvals` unilateral. A aprovação enviada pelo chamador não altera o estado: operações sensíveis continuam `blocked` e exigem aprovação no cliente autorizado.
+
+Validações executadas: `npm ci`, `npm run check` com 23 testes aprovados, `npm ci --prefix apps/mcp-server`, typecheck, build Next.js, smoke MCP local e `git diff --check`. O smoke confirmou as três tools, annotations read-only, envelope Core e os estados `ok`, `needs_input` e `blocked`.
+
+O Preview Vercel do PR #5 foi confirmado como READY no commit `a1c725b378ae9c274b9740f9d1a49245415f8d12`, deployment `projectos-cfcjquhsj-juniors-projects-21c34634.vercel.app`. A requisição direta sem autenticação foi redirecionada pela proteção Vercel; `vc curl` autenticado confirmou `/api/health` 200. A variável `PROJECTOS_MCP_TOKEN` existe como segredo no ambiente Preview, mas nenhum token válido estava disponível nesta sessão. Portanto, as chamadas MCP remotas autenticadas não foram executadas e permanecem pendência de homologação humana; não houve tentativa de recuperar ou imprimir o segredo.
+
+### Achados
+
+- P0/P1: nenhum encontrado na revisão local.
+- P2: homologação MCP remota válida bloqueada pela indisponibilidade segura do token Preview. Requer execução posterior com credencial fornecida pelo mecanismo autorizado.
+- P3: a detecção textual de operações sensíveis é conservadora e não substitui uma política de autorização completa; formalização fica para F5.
+- P3: riscos herdados da F2 — OAuth, rate limiting, rotação de token, pinagem de Actions e Blueprint F0 ausente — permanecem fora do escopo F4.
+
 ## Limitações desta etapa
 
-F4 está em implementação e não deve ser marcada como concluída antes da revisão, CI, integração segura e homologação. O fluxo ainda não persiste estado, não executa tarefas e não substitui a coleta de evidências no cliente.
+F4 está em implementação e não deve ser marcada como concluída antes da aprovação, CI final do novo HEAD e homologação remota autenticada. O fluxo ainda não persiste estado, não executa tarefas e não substitui a coleta de evidências no cliente.
