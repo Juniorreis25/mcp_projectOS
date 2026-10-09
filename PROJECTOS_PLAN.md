@@ -1,5 +1,5 @@
 # ProjectOS — Plano-Mestre de Implementação
-Versão: 2.3 | Atualizado em: 2026-10-09 | Status: F0, F1 e F2 concluídas; F3–F8 não iniciadas
+Versão: 3.0 | Atualizado em: 2026-10-09 | Status: F0, F1 e F2 concluídas; F3 iniciada, F3.1 tecnicamente validada, F3.2 não iniciada; F4–F8 não iniciadas
 
 ## Objetivo
 Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para projetos novos, existentes e retomadas.
@@ -31,10 +31,21 @@ Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para pro
 - **Aceite:** achados P1/P2 corrigidos e validados; PR #2 integrado; `main` validada pelo CI pós-merge. F2 formalmente encerrada.
 
 ### F3 — Compatibilidade
-- **Status:** Planejada, não iniciada.
+- **Status:** Iniciada exclusivamente pela F3.1; F3.1 bloqueada por proteção SSO do preview Vercel; F3.2 não iniciada.
 - **Objetivo:** comprovar que o mesmo servidor MCP remoto é utilizável no Codex e no VS Code sem alterar o runtime da F2.
 - **Plano de execução:** documentar a configuração do endpoint remoto em cada cliente; fornecer a credencial somente por mecanismo seguro e fora de arquivos versionados; executar descoberta de ferramentas; invocar `projectos.list_skills`; invocar `projectos.get_skill` para `discover` e `plan`; registrar request/response sanitizados, `request_id`, status, envelope e diferenças de comportamento; registrar limitações de transporte, autenticação, proteção do preview e suporte de cada cliente.
 - **Critérios de aceite:** ambos os clientes conectam ao mesmo endpoint; ambos descobrem `projectos.list_skills` e `projectos.get_skill`; `discover` e `plan` retornam identificador, versão, manifesto, instruções e envelope Core válido; nenhuma credencial aparece em logs, arquivos ou evidências; diferenças e limitações ficam documentadas; não são introduzidas operações destrutivas.
+- **F3.1 — Codex:** tecnicamente validada com base em evidência reportada pelo Orquestrador. O teste real com Codex CLI `0.162.0` concluiu handshake, descobriu `projectos.list_skills`/`projectos.get_skill`, retornou duas skills (`projectos.discover` e `projectos.plan`, ambas `0.1.0`), validou envelope Core `1.0`, três `request_id` distintos e ausência de alterações de arquivos. Esta execução não foi reobservada nesta sessão; os dois avisos de hook permanecem pendência ambiental de baixo impacto. Evidência detalhada: `docs/f3/f3.1-codex.md`; [PR draft #3](https://github.com/Juniorreis25/mcp_projectOS/pull/3).
+- **Proteção e credenciais:** a configuração recomendada é `bearer_token_env_var = "PROJECTOS_MCP_TOKEN"` mais `env_http_headers = { "x-vercel-protection-bypass" = "VERCEL_AUTOMATION_BYPASS_SECRET" }`, sem valores em arquivos. Não foi gerado, alterado, revogado ou descriptografado segredo nesta F3.1.
+- **Preparação segura:** Protection Bypass for Automation é disponível no plano Hobby, mas a existência/valor de um segredo não foi consultada em claro. Foi preparado procedimento PowerShell com `Read-Host -AsSecureString`, variáveis somente no processo, verificação booleana e limpeza explícita. O Codex Desktop pode não herdar alterações de uma sessão PowerShell existente; os testes devem usar uma sessão/processo iniciado depois da injeção comprovada.
+- **Alternativa:** se o bypass não for compatível, avaliar OIDC de desenvolvimento da Vercel via `x-vercel-trusted-oidc-idp-token` ou ambiente MCP dedicado não produtivo. Não usar `vercel curl` como evidência de interoperabilidade Codex e não desativar SSO.
+- **Limitação de pipeline:** o projeto Vercel está ligado ao GitHub com `productionBranch: main` e criação de deployments habilitada; pushes em `main` geraram `target=production` automaticamente. Não houve publicação manual nesta F3.1. O projeto possui domínios de produção e o token `PROJECTOS_MCP_TOKEN` aparece apenas em `preview`; a governança do pipeline e a configuração de runtime de produção devem ser decididas antes de novos merges.
+- **Política recomendada:** proteger `main`, exigir checks F1/F2 e usar promoção explícita para produção; manter as próximas atividades em branches de preview até a decisão de governança. Nenhuma configuração Vercel foi alterada.
+- **Critério de continuidade:** A–F da F3.1 foram considerados atendidos com base no relato verificável do Orquestrador; a pendência dos hooks é ambiental e não bloqueante. F3.2 permanece não iniciada e exige nova autorização operacional, credenciais seguras e registro do ambiente VS Code.
+- **Próxima atividade:** F3.2 — VS Code, recomendada para início controlado após autorização do Orquestrador. A F3 inteira não está concluída.
+- **Hooks:** duas mensagens `Hook failed — hook exited with code 1` foram atribuídas com alta probabilidade aos hooks globais da skill Impeccable no Codex, não ao ProjectOS. A investigação é pendência não bloqueante; nenhum hook foi desativado.
+- **F3.2 — VS Code (procedimento preparado, não executado):** configurar somente em escopo de usuário/workspace apropriado, confirmar suporte a HTTP Streamable, fornecer `Authorization: Bearer` do ProjectOS e `x-vercel-protection-bypass` por entradas protegidas/ambiente seguro, verificar descoberta, `list_skills`, `discover`, `plan`, envelope e ausência de escrita. Não iniciar até registrar versão do VS Code/Copilot, método de armazenamento e disponibilidade das duas credenciais.
+- **F3.2 — credenciais:** preferir configuração sem valores versionados; validar a diferença entre `.vscode/mcp.json` com inputs interativos e `.mcp.json`/`~/.copilot/mcp-config.json` usados diretamente pelo Agent Host. Inputs interativos podem não ser encaminhados ao Agent Host; essa compatibilidade deve ser comprovada antes dos testes.
 
 ### F4 — Fluxo universal
 - **Status:** Não iniciada.
@@ -65,6 +76,10 @@ Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para pro
 Após cada fase ou marco relevante, registrar data, evidências verificáveis (commit, PR, workflow), testes, bloqueios e próxima ação. Não marcar fase concluída sem aceite verificável.
 
 ## Histórico
+- 2026-10-09 — v2.7: Orquestrador reportou teste real Codex aprovado para handshake, catálogo, discover, plan, envelope Core e limites read-only; F3.1 tecnicamente validada; duas falhas de hook global Impeccable diagnosticadas como pendência não bloqueante; procedimento F3.2 VS Code preparado sem execução.
+- 2026-10-09 — v2.6: disponibilidade do Protection Bypass confirmada por plano/documentação; existência do segredo não consultada em claro; procedimento PowerShell efêmero, verificação sem valores, limpeza, alternativa OIDC e recomendação de governança de `main` documentados; F3.1 permanece bloqueada aguardando provisionamento humano autorizado.
+- 2026-10-09 — v2.5: preview de evidência do PR #3 confirmado no commit `08d5eb1`; `POST /mcp` sem bypass reproduziu `401 Protected deployment`; suporte a `bearer_token_env_var` e `env_http_headers` documentado; ausência de segredos locais confirmada sem exposição; auditoria confirmou `productionBranch: main`, deploys automáticos e ausência de `PROJECTOS_MCP_TOKEN` em production; F3.1 permanece bloqueada.
+- 2026-10-09 — v2.4: F3.1 iniciada com Codex CLI `0.162.0-alpha.2`; preview F2 confirmado, handshake bloqueado por SSO Vercel, sem execução de tools; branch de documentação preparada; F3.2 não iniciada.
 - 2026-10-09 — v2.3: PR #2 integrado por squash no commit `6c059ec`; `main` validada pelo F1 pós-merge `37961964643`; F2 formalmente encerrada; plano da F3 registrado sem execução.
 - 2026-10-09 — v2.2: ajuste final de erro de catálogo também envelopado; CI e preview do commit `73f985d` aprovados, smoke remoto repetido; F2 aguarda decisão do Orquestrador.
 - 2026-10-09 — v2.1: correções do envelope Core, DELETE autenticado, cobertura de `projectos.plan`, Bearer normalizado, ADR, CI #20/#23 e novo preview remoto aprovados; F2 permanece em revisão do Orquestrador.
@@ -78,3 +93,24 @@ Após cada fase ou marco relevante, registrar data, evidências verificáveis (c
 - 2026-10-09 — v1.2: aprovação expressa da F0.
 - 2026-10-09 — v1.1: Blueprint enviado para aprovação.
 - 2026-10-09 — v1.0: planejamento inicial.
+
+## F3.2 — Achado VS Code (2026-10-09)
+- O VS Code conseguiu conectar ao MCP (`Running`) e descobrir duas tools, mas rejeitou nomes com ponto: `projectos.list_skills`, `projectos.get_skill`.
+- Correção proposta na branch `fix/f3-vscode-tool-names`: renomear apenas tools para `projectos_list_skills` e `projectos_get_skill`, preservando os IDs de skills `projectos.discover` e `projectos.plan`.
+- Smoke automatizado adaptado para verificar ambos os nomes com regex `^[a-z0-9_-]+$`.
+- F3.2 permanece em andamento. Após merge e novo preview da Vercel, repetir teste no VS Code com URL do deployment mais recente. Não divulgar tokens.
+
+## Atualização F3.2 — Evidência Codex CLI (2026-10-09)
+- **Status:** F3.2 parcialmente validada; F3 aberta.
+- VS Code MCP Extension Host: conexão Running e descoberta de 2 tools, sem novos avisos de nomes inválidos.
+- Codex CLI 0.162.0: três chamadas reais reportadas com sucesso (`projectos_list_skills`, `projectos_get_skill` discover e plan); Core `1.0`, status `ok`, versões `0.1.0` e request_ids distintos: `9c887e9e-79a2-42b8-b483-789530ce69e3`, `2ea62feb-f84c-4e00-a8bd-eccf6c022ba3`, `2e10ba4c-921b-41bd-b206-e2cddbde2046`.
+- Agente integrado ao VS Code: ferramentas ainda indisponíveis; validação de invocação pendente.
+- Erros OAuth do Supabase e avisos de hooks Stop não bloquearam a chamada CLI do ProjectOS.
+- **Fonte:** logs fornecidos pelo operador, não reexecutados nesta sessão. Relatório: [docs/f3/f3.2-vscode-codex.md](docs/f3/f3.2-vscode-codex.md).
+
+## Atualização de validação — F3.2 (2026-10-09)
+- Codex integrado ao VS Code: **tecnicamente validado conforme relato do operador**, com três chamadas reais reportadas; `projectos_list_skills` e duas chamadas `projectos_get_skill`.
+- Skills: `projectos.discover` e `projectos.plan`, versão `0.1.0`. Envelope Core `1.0`, status `ok`, request IDs distintos: `c1a7f542-2896-4267-8d0b-6aa0fde55526`, `b2b45155-cd50-4470-8ba2-bf80e5fe9e87`, `4e9ed10c-c96b-4802-9288-8f9864056879`.
+- Nenhuma escrita ou vazamento de credencial foi relatado. Evidências não reexecutadas nesta sessão.
+- **F3:** aceite funcional F3.1/F3.2 documentado; permanece aberta para conferência e integração dos PRs #3 e #4, sem antecipar merge.
+- Documento: `docs/f3/f3.2-vscode-codex.md`.

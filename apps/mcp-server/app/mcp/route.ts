@@ -9,7 +9,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const handler = createMcpHandler((server) => {
-  server.registerTool('projectos.list_skills', {
+  server.registerTool('projectos_list_skills', {
     title: 'List ProjectOS skills',
     description: 'List published ProjectOS skills and their versions.',
     inputSchema: z.object({}).strict(),
@@ -19,7 +19,7 @@ const handler = createMcpHandler((server) => {
     return {content: [{type: 'text', text: JSON.stringify(response)}], structuredContent: response};
   });
 
-  server.registerTool('projectos.get_skill', {
+  server.registerTool('projectos_get_skill', {
     title: 'Get ProjectOS skill',
     description: 'Read a versioned ProjectOS skill definition and instructions.',
     inputSchema: z.object({id: z.enum(['projectos.discover','projectos.plan'])}).strict(),
