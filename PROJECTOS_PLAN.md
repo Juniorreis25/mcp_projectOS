@@ -1,5 +1,5 @@
 # ProjectOS — Plano-Mestre de Implementação
-Versão: 2.5 | Atualizado em: 2026-10-09 | Status: F0, F1 e F2 concluídas; F3 iniciada, F3.1 bloqueada; F3.2–F8 não iniciadas
+Versão: 2.6 | Atualizado em: 2026-10-09 | Status: F0, F1 e F2 concluídas; F3 iniciada, F3.1 bloqueada; F3.2–F8 não iniciadas
 
 ## Objetivo
 Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para projetos novos, existentes e retomadas.
@@ -37,7 +37,10 @@ Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para pro
 - **Critérios de aceite:** ambos os clientes conectam ao mesmo endpoint; ambos descobrem `projectos.list_skills` e `projectos.get_skill`; `discover` e `plan` retornam identificador, versão, manifesto, instruções e envelope Core válido; nenhuma credencial aparece em logs, arquivos ou evidências; diferenças e limitações ficam documentadas; não são introduzidas operações destrutivas.
 - **F3.1 — Codex:** bloqueada. O Codex CLI `0.162.0-alpha.2` suporta `bearer_token_env_var` e `env_http_headers`, mas os dois segredos não estavam disponíveis no ambiente local autorizado. O preview de evidência do PR #3 está `READY` no commit `08d5eb1`; o handshake MCP recebeu `401 Protected deployment` da Vercel antes do Bearer do ProjectOS. Os testes A–E não foram aprovados nem executados além do handshake; F foi apenas inspecionada estaticamente. Evidência: `docs/f3/f3.1-codex.md`; [PR draft #3](https://github.com/Juniorreis25/mcp_projectOS/pull/3).
 - **Proteção e credenciais:** a configuração recomendada é `bearer_token_env_var = "PROJECTOS_MCP_TOKEN"` mais `env_http_headers = { "x-vercel-protection-bypass" = "VERCEL_AUTOMATION_BYPASS_SECRET" }`, sem valores em arquivos. Não foi gerado, alterado, revogado ou descriptografado segredo nesta F3.1.
+- **Preparação segura:** Protection Bypass for Automation é disponível no plano Hobby, mas a existência/valor de um segredo não foi consultada em claro. Foi preparado procedimento PowerShell com `Read-Host -AsSecureString`, variáveis somente no processo, verificação booleana e limpeza explícita. O Codex Desktop pode não herdar alterações de uma sessão PowerShell existente; os testes devem usar uma sessão/processo iniciado depois da injeção comprovada.
+- **Alternativa:** se o bypass não for compatível, avaliar OIDC de desenvolvimento da Vercel via `x-vercel-trusted-oidc-idp-token` ou ambiente MCP dedicado não produtivo. Não usar `vercel curl` como evidência de interoperabilidade Codex e não desativar SSO.
 - **Limitação de pipeline:** o projeto Vercel está ligado ao GitHub com `productionBranch: main` e criação de deployments habilitada; pushes em `main` geraram `target=production` automaticamente. Não houve publicação manual nesta F3.1. O projeto possui domínios de produção e o token `PROJECTOS_MCP_TOKEN` aparece apenas em `preview`; a governança do pipeline e a configuração de runtime de produção devem ser decididas antes de novos merges.
+- **Política recomendada:** proteger `main`, exigir checks F1/F2 e usar promoção explícita para produção; manter as próximas atividades em branches de preview até a decisão de governança. Nenhuma configuração Vercel foi alterada.
 - **Critério de continuidade:** somente após injeção segura e autorizada dos dois segredos deve-se repetir A–F pelo Codex. F3.2 não iniciada.
 - **Próxima atividade:** F3.2 — VS Code, somente após decisão sobre o bloqueio de autenticação/proteção do preview. A F3 inteira não está concluída.
 
@@ -70,6 +73,7 @@ Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para pro
 Após cada fase ou marco relevante, registrar data, evidências verificáveis (commit, PR, workflow), testes, bloqueios e próxima ação. Não marcar fase concluída sem aceite verificável.
 
 ## Histórico
+- 2026-10-09 — v2.6: disponibilidade do Protection Bypass confirmada por plano/documentação; existência do segredo não consultada em claro; procedimento PowerShell efêmero, verificação sem valores, limpeza, alternativa OIDC e recomendação de governança de `main` documentados; F3.1 permanece bloqueada aguardando provisionamento humano autorizado.
 - 2026-10-09 — v2.5: preview de evidência do PR #3 confirmado no commit `08d5eb1`; `POST /mcp` sem bypass reproduziu `401 Protected deployment`; suporte a `bearer_token_env_var` e `env_http_headers` documentado; ausência de segredos locais confirmada sem exposição; auditoria confirmou `productionBranch: main`, deploys automáticos e ausência de `PROJECTOS_MCP_TOKEN` em production; F3.1 permanece bloqueada.
 - 2026-10-09 — v2.4: F3.1 iniciada com Codex CLI `0.162.0-alpha.2`; preview F2 confirmado, handshake bloqueado por SSO Vercel, sem execução de tools; branch de documentação preparada; F3.2 não iniciada.
 - 2026-10-09 — v2.3: PR #2 integrado por squash no commit `6c059ec`; `main` validada pelo F1 pós-merge `37961964643`; F2 formalmente encerrada; plano da F3 registrado sem execução.
