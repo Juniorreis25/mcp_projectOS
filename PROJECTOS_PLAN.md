@@ -1,5 +1,5 @@
 # ProjectOS — Plano-Mestre de Implementação
-Versão: 2.3 | Atualizado em: 2026-10-09 | Status: F0, F1 e F2 concluídas; F3–F8 não iniciadas
+Versão: 2.4 | Atualizado em: 2026-10-09 | Status: F0, F1 e F2 concluídas; F3 iniciada, F3.1 bloqueada; F3.2–F8 não iniciadas
 
 ## Objetivo
 Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para projetos novos, existentes e retomadas.
@@ -31,10 +31,13 @@ Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para pro
 - **Aceite:** achados P1/P2 corrigidos e validados; PR #2 integrado; `main` validada pelo CI pós-merge. F2 formalmente encerrada.
 
 ### F3 — Compatibilidade
-- **Status:** Planejada, não iniciada.
+- **Status:** Iniciada exclusivamente pela F3.1; F3.1 bloqueada por proteção SSO do preview Vercel; F3.2 não iniciada.
 - **Objetivo:** comprovar que o mesmo servidor MCP remoto é utilizável no Codex e no VS Code sem alterar o runtime da F2.
 - **Plano de execução:** documentar a configuração do endpoint remoto em cada cliente; fornecer a credencial somente por mecanismo seguro e fora de arquivos versionados; executar descoberta de ferramentas; invocar `projectos.list_skills`; invocar `projectos.get_skill` para `discover` e `plan`; registrar request/response sanitizados, `request_id`, status, envelope e diferenças de comportamento; registrar limitações de transporte, autenticação, proteção do preview e suporte de cada cliente.
 - **Critérios de aceite:** ambos os clientes conectam ao mesmo endpoint; ambos descobrem `projectos.list_skills` e `projectos.get_skill`; `discover` e `plan` retornam identificador, versão, manifesto, instruções e envelope Core válido; nenhuma credencial aparece em logs, arquivos ou evidências; diferenças e limitações ficam documentadas; não são introduzidas operações destrutivas.
+- **F3.1 — Codex:** bloqueada. O preview respondeu health `200` e foi confirmado no commit F2 `73f985d`, mas o handshake MCP do Codex recebeu `401 Protected deployment` da Vercel antes do Bearer do ProjectOS. Os testes A–E não foram aprovados nem executados além do handshake; F foi apenas inspecionada estaticamente. Evidência: `docs/f3/f3.1-codex.md`.
+- **Limitação de pipeline:** o projeto Vercel gerou automaticamente deployments `target=production` após pushes em `main`; nenhuma publicação manual foi feita nesta F3.1. A configuração deve ser revisada antes de novos merges.
+- **Próxima atividade:** F3.2 — VS Code, somente após decisão sobre o bloqueio de autenticação/proteção do preview. A F3 inteira não está concluída.
 
 ### F4 — Fluxo universal
 - **Status:** Não iniciada.
@@ -65,6 +68,7 @@ Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para pro
 Após cada fase ou marco relevante, registrar data, evidências verificáveis (commit, PR, workflow), testes, bloqueios e próxima ação. Não marcar fase concluída sem aceite verificável.
 
 ## Histórico
+- 2026-10-09 — v2.4: F3.1 iniciada com Codex CLI `0.162.0-alpha.2`; preview F2 confirmado, handshake bloqueado por SSO Vercel, sem execução de tools; branch de documentação preparada; F3.2 não iniciada.
 - 2026-10-09 — v2.3: PR #2 integrado por squash no commit `6c059ec`; `main` validada pelo F1 pós-merge `37961964643`; F2 formalmente encerrada; plano da F3 registrado sem execução.
 - 2026-10-09 — v2.2: ajuste final de erro de catálogo também envelopado; CI e preview do commit `73f985d` aprovados, smoke remoto repetido; F2 aguarda decisão do Orquestrador.
 - 2026-10-09 — v2.1: correções do envelope Core, DELETE autenticado, cobertura de `projectos.plan`, Bearer normalizado, ADR, CI #20/#23 e novo preview remoto aprovados; F2 permanece em revisão do Orquestrador.
