@@ -1,4 +1,4 @@
-import { envelope, type Envelope, type Mode, type Risk, type WorkflowState } from './contracts.js';
+import { envelope, type Envelope, type Mode, type Risk, type Status, type WorkflowState } from './contracts.js';
 
 export const F5_CONTRACT_VERSION = '1.0.0' as const;
 export const F5_CAPABILITY_IDS = ['spec', 'build', 'review', 'test', 'debug', 'protect'] as const;
@@ -85,7 +85,7 @@ function hasOnlyKnownFields(value: Record<string, unknown>, fields: readonly str
   }
 }
 
-function readString(value: unknown, path: string, required: boolean, issues: ValidationIssue[]): string | undefined {
+export function readString(value: unknown, path: string, required: boolean, issues: ValidationIssue[]): string | undefined {
   if (value === undefined) {
     if (required) issues.push({path, code: 'MISSING_REQUIRED', message: `${path} is required`});
     return undefined;
@@ -99,7 +99,7 @@ function readString(value: unknown, path: string, required: boolean, issues: Val
   return trimmed;
 }
 
-function readStringList(value: unknown, path: string, required: boolean, issues: ValidationIssue[]): string[] | undefined {
+export function readStringList(value: unknown, path: string, required: boolean, issues: ValidationIssue[]): string[] | undefined {
   if (value === undefined) {
     if (required) issues.push({path, code: 'MISSING_REQUIRED', message: `${path} is required`});
     return undefined;
@@ -171,12 +171,17 @@ function readRequestBase(input: Record<string, unknown>, issues: ValidationIssue
   };
 }
 
-export function validateCapabilityRequest(input: unknown): ValidationResult<CapabilityRequest> {
+export function validateCapabilityRequest(input: unknown, additionalFields: readonly string[] = []): ValidationResult<CapabilityRequest> {
   const issues: ValidationIssue[] = [];
   if (!isRecord(input)) return {valid: false, value: null, issues: [{path: '', code: 'INVALID_TYPE', message: 'Request must be an object'}]};
-  hasOnlyKnownFields(input, ['capability_id', 'capability_version', 'project_id', 'mode', 'evidence', 'requested_operations', 'approvals'], issues);
+  hasOnlyKnownFields(input, ['capability_id', 'capability_version', 'project_id', 'mode', 'evidence', 'requested_operations', 'approvals', ...additionalFields], issues);
   const value = readRequestBase(input, issues);
   return {valid: issues.length === 0, value: issues.length === 0 ? value : null, issues};
+}
+
+export function validationStatus(issues: ValidationIssue[]): Extract<Status, 'needs_input' | 'error'> {
+  const hasMalformedInput = issues.some(issue => ['INVALID_TYPE', 'INVALID_VALUE', 'UNSUPPORTED_VERSION', 'UNKNOWN_FIELD'].includes(issue.code));
+  return hasMalformedInput ? 'error' : issues.some(issue => issue.code === 'MISSING_REQUIRED') ? 'needs_input' : 'error';
 }
 
 export function validateSpecRequest(input: unknown): ValidationResult<SpecRequest> {
@@ -227,10 +232,9 @@ function commonData<T>(request: SpecRequest, proposal: T, state: WorkflowState, 
 export function prepareSpec(requestId: string, input: unknown): CapabilityEnvelope<SpecProposal> {
   const validation = validateSpecRequest(input);
   if (!validation.valid || !validation.value) {
-    const missing = validation.issues.some(issue => issue.code === 'MISSING_REQUIRED');
-    return envelope(requestId, missing ? 'needs_input' : 'error', null, {
+    return envelope(requestId, validationStatus(validation.issues), null, {
       warnings: validation.issues.map(issue => `${issue.path || 'request'}: ${issue.message}`),
-      next_actions: [missing ? 'Provide the missing specification inputs and evidence' : 'Correct the invalid specification request'],
+      next_actions: [validationStatus(validation.issues) === 'needs_input' ? 'Provide the missing specification inputs and evidence' : 'Correct the invalid specification request'],
     });
   }
 
