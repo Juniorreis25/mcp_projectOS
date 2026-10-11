@@ -1,6 +1,6 @@
 # F4 — Fluxo Universal de Projetos
 
-Status: em andamento — implementação inicial na branch `feat/f4-universal-project-flow`; aceite técnico ainda bloqueado.
+Status: tecnicamente homologada por evidências remotas reportadas — aguardando integração autorizada; F4 não está concluída na `main`.
 
 ## Objetivo
 
@@ -77,6 +77,37 @@ A correção mínima adiciona duas verificações somente para `new`: sinais tex
 Os fixtures de regressão confirmaram `needs_input` para objetivo genérico e ambiguidade explícita. A homologação remota ainda não foi repetida nesta rodada.
 
 O smoke MCP cobre catálogo com três skills, descoberta das três tools, `projectos.start`, envelope, request IDs, proposta válida e resposta `blocked` para deploy.
+
+## Homologação remota consolidada — 2026-10-11
+
+A homologação MCP nativa foi reportada como concluída no deployment Preview `dpl_CoXcTyZxoHN2PVYEmVZ4ZcB1pNZJ`, correspondente ao commit `c136b13d1444217500822445addccc69aa8c257c` da branch `feat/f4-universal-project-flow`.
+
+- Deployment: `READY`, ambiente Preview, com Deployment Protection ativa.
+- Host imutável do deployment: `https://projectos-jz034xvc6-juniors-projects-21c34634.vercel.app`.
+- Endpoint MCP: `https://projectos-jz034xvc6-juniors-projects-21c34634.vercel.app/mcp`.
+- Fonte da evidência: relato de homologação MCP nativa recebido do Orquestrador; as chamadas remotas não foram reexecutadas nesta sessão.
+- Os valores dos tokens não foram registrados. Os request IDs da execução reportada não foram preservados no material disponível nesta cópia; por isso aparecem como `não retido` abaixo, e não como IDs inventados.
+
+### Matriz reportada
+
+| Cenário | Resultado reportado | Estado/modo | Request ID sanitizado |
+| --- | --- | --- | --- |
+| Objetivo claro para projeto novo | PASS | `ok` / `new` | não retido |
+| Snapshot válido de projeto existente | PASS | `ok` / `existing` | não retido |
+| Histórico suficiente de recuperação | PASS | `ok` / `recovery` | não retido |
+| Objetivo genérico sem contexto suficiente | PASS | `needs_input` | não retido |
+| Ambiguidade explícita no objetivo | PASS | `needs_input` | não retido |
+| Evidências contraditórias | PASS | `needs_input` | não retido |
+| Operação sensível solicitada | PASS | `blocked` | não retido |
+| Aprovação unilateral declarada no payload | PASS | `blocked` | não retido |
+
+Além dos oito cenários de fluxo, foram reportadas como validadas as tools `projectos_list_skills` e `projectos_get_skill`, incluindo a preservação dos identificadores de skill `projectos.discover` e `projectos.plan`. O envelope Core, os campos obrigatórios e a fronteira read-only também foram reportados como válidos.
+
+### Correção da ambiguidade
+
+A implementação anterior aceitava qualquer objetivo não vazio como `new`. A correção em `c136b13` passou a exigir especificidade ou escopo e a retornar `needs_input` para objetivos genéricos ou explicitamente ambíguos. A homologação remota reportada validou essa correção. Esta conclusão é evidência reportada, não uma nova execução remota realizada nesta sessão.
+
+Esta alteração é documental em relação ao HEAD já homologado: não modifica runtime, autenticação, transporte, tokens ou Deployment Protection.
 
 ## Revisão de segurança e homologação — 2026-10-09
 
