@@ -86,6 +86,7 @@ Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para pro
 - **Status:** Próxima fase de implementação; não iniciada.
 - **Atividades:** spec, build, review, test, debug, protect.
 - **Aceite:** Revisão, testes e bloqueio das operações sensíveis.
+- **F5.1:** Contratos versionados e função pura de especificação implementados na branch `feat/f5-core-contracts`; sem exposição MCP, execução externa, persistência ou alteração da F4. Versões não suportadas, entradas semanticamente incompletas e qualquer operação solicitada são rejeitadas de forma determinística; autorização de execução permanece no cliente autorizado sob política própria. Aguardando revisão e integração.
 
 ### F6 — Catálogo completo
 - **Status:** Próxima fase planejada; não iniciada.
@@ -108,6 +109,7 @@ Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para pro
 Após cada fase ou marco relevante, registrar data, evidências verificáveis (commit, PR, workflow), testes, bloqueios e próxima ação. Não marcar fase concluída sem aceite verificável.
 
 ## Histórico
+- 2026-10-11 — F5.1: contratos compartilhados das capacidades e preparação read-only de `spec` implementados em branch dedicada; validação e CI aguardam execução.
 - 2026-10-11 — v3.5: F4 integrada à `main` pelo PR #5, squash commit `32f7947`; CI F1/F2 pós-merge aprovado; Preview pós-merge READY; `release/production` preservada como Production Branch; F7 classificada como BACKLOG FUTURO e sem dependência obrigatória para F8 ou release 1.0.
 - 2026-10-11 — v3.4: homologação MCP nativa da F4 reportada no deployment Preview `dpl_CoXcTyZxoHN2PVYEmVZ4ZcB1pNZJ`, commit `c136b13`; oito cenários, catálogo e correção da ambiguidade registrados como aprovados; request IDs não retidos no material local; F4 aguarda integração autorizada e não foi marcada concluída.
 - 2026-10-11 — v3.3: investigação da divergência `needs_input`; payload remoto exato indisponível, fixtures novas reproduziram a seleção indevida de `new`; correção mínima para objetivos genéricos/ambíguos, dois testes de regressão e checks locais aprovados; F4 permanece bloqueada aguardando CI do novo HEAD e homologação remota.
