@@ -26,8 +26,6 @@ export interface CapabilityData<TProposalOrFindings> {
   risks: CapabilityRisk[];
   decisions_pending: string[];
   execution_location: 'client';
-  evidence_refs: string[];
-  next_actions: string[];
 }
 
 export type CapabilityEnvelope<TProposalOrFindings> = Envelope<CapabilityData<TProposalOrFindings> | null>;
@@ -63,7 +61,7 @@ export interface SpecProposal {
 
 export interface ValidationIssue {
   path: string;
-  code: 'INVALID_TYPE' | 'MISSING_REQUIRED' | 'INVALID_VALUE' | 'UNKNOWN_FIELD';
+  code: 'INVALID_TYPE' | 'MISSING_REQUIRED' | 'INVALID_VALUE' | 'UNSUPPORTED_VERSION' | 'UNKNOWN_FIELD';
   message: string;
 }
 
@@ -75,7 +73,7 @@ export interface ValidationResult<T> {
 
 const capabilityIdSet = new Set<string>(F5_CAPABILITY_IDS);
 const modeSet = new Set<Mode>(['new', 'existing', 'recovery']);
-const sensitiveOperation = /delete|remove|drop|migrat|deploy|publish|write|execute|shell|command|credential|secret|production/i;
+const supportedVersions = new Set<string>([F5_CONTRACT_VERSION]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -97,7 +95,7 @@ function readString(value: unknown, path: string, required: boolean, issues: Val
     return undefined;
   }
   const trimmed = value.trim();
-  if (!trimmed) issues.push({path, code: 'INVALID_VALUE', message: `${path} must not be empty`});
+  if (!trimmed) issues.push({path, code: required ? 'MISSING_REQUIRED' : 'INVALID_VALUE', message: `${path} must not be empty`});
   return trimmed;
 }
 
@@ -159,6 +157,7 @@ function readRequestBase(input: Record<string, unknown>, issues: ValidationIssue
 
   if (capabilityId && !capabilityIdSet.has(capabilityId)) issues.push({path: 'capability_id', code: 'INVALID_VALUE', message: 'Unsupported F5 capability'});
   if (capabilityVersion && !/^\d+\.\d+\.\d+$/.test(capabilityVersion)) issues.push({path: 'capability_version', code: 'INVALID_VALUE', message: 'capability_version must use semantic versioning'});
+  else if (capabilityVersion && !supportedVersions.has(capabilityVersion)) issues.push({path: 'capability_version', code: 'UNSUPPORTED_VERSION', message: `Unsupported F5 contract version: ${capabilityVersion}`});
   if (mode && !modeSet.has(mode)) issues.push({path: 'mode', code: 'INVALID_VALUE', message: 'mode must be new, existing or recovery'});
 
   return {
@@ -211,11 +210,7 @@ function evidenceRefs(evidence: CapabilityEvidence[]): string[] {
   return evidence.map(item => item.ref);
 }
 
-function sensitiveOperations(operations: string[] | undefined): string[] {
-  return (operations ?? []).filter(operation => sensitiveOperation.test(operation));
-}
-
-function commonData<T>(request: SpecRequest, proposal: T, state: WorkflowState, risks: CapabilityRisk[], decisions: string[], nextActions: string[]): CapabilityData<T> {
+function commonData<T>(request: SpecRequest, proposal: T, state: WorkflowState, risks: CapabilityRisk[], decisions: string[]): CapabilityData<T> {
   return {
     capability_id: request.capability_id,
     capability_version: request.capability_version,
@@ -226,8 +221,6 @@ function commonData<T>(request: SpecRequest, proposal: T, state: WorkflowState, 
     risks,
     decisions_pending: decisions,
     execution_location: 'client',
-    evidence_refs: evidenceRefs(request.evidence),
-    next_actions: nextActions,
   };
 }
 
@@ -242,7 +235,8 @@ export function prepareSpec(requestId: string, input: unknown): CapabilityEnvelo
   }
 
   const request = validation.value;
-  const sensitive = sensitiveOperations(request.requested_operations);
+  // requested_operations expresses intent only; any non-empty list is outside this read-only capability.
+  const requestedOperations = request.requested_operations ?? [];
   const proposal: SpecProposal = {
     objective: request.objective,
     scope: request.scope,
@@ -253,22 +247,24 @@ export function prepareSpec(requestId: string, input: unknown): CapabilityEnvelo
     unresolved_questions: [],
   };
 
-  if (sensitive.length > 0) {
-    const requiredApprovals = sensitive.map(operation => `human:approve:${operation}`);
+  if (requestedOperations.length > 0) {
+    const requiredApprovals = requestedOperations.map(operation => `human:approve:${operation}`);
+    const nextActions = ['Keep the capability blocked', 'Obtain approval in the authorized client', 'Re-submit a read-only specification'];
     const data = commonData(request, proposal, 'blocked', [{
       id: 'sensitive-operation',
       level: 'critical',
-      summary: `Sensitive operations were requested: ${sensitive.join(', ')}`,
-      mitigation: 'The authorized client must evaluate and execute any such operation after explicit approval',
-    }], ['Whether and when the authorized client may perform the requested operation'], ['Keep the capability blocked', 'Obtain approval in the authorized client', 'Re-submit a read-only specification']);
-    return envelope(requestId, 'blocked', data, {required_approvals: requiredApprovals, evidence_refs: data.evidence_refs, next_actions: data.next_actions});
+      summary: `Execution was requested outside the read-only specification capability: ${requestedOperations.join(', ')}`,
+      mitigation: 'The authorized client must evaluate and execute any such operation under its own security policy after explicit approval',
+    }], ['Whether and when the authorized client may perform the requested operation']);
+    return envelope(requestId, 'blocked', data, {required_approvals: requiredApprovals, evidence_refs: evidenceRefs(request.evidence), next_actions: nextActions});
   }
 
+  const nextActions = ['Review the specification with the client', 'Proceed to a separately approved build plan'];
   const data = commonData(request, proposal, 'planned', [{
     id: 'client-execution-boundary',
     level: 'low',
     summary: 'The specification is a proposal based on client-provided context',
     mitigation: 'Review the proposal and keep implementation and execution in the authorized client',
-  }], [], ['Review the specification with the client', 'Proceed to a separately approved build plan']);
-  return envelope(requestId, 'ok', data, {evidence_refs: data.evidence_refs, next_actions: data.next_actions});
+  }], []);
+  return envelope(requestId, 'ok', data, {evidence_refs: evidenceRefs(request.evidence), next_actions: nextActions});
 }

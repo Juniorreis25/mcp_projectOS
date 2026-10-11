@@ -51,6 +51,22 @@ test('returns error for malformed capability input', () => {
   assert.equal(response.data, null);
 });
 
+test('rejects future SemVer versions as unsupported', () => {
+  const validation = validateSpecRequest({...validSpec, capability_version: '2.0.0'});
+  assert.equal(validation.valid, false);
+  assert.ok(validation.issues.some(issue => issue.code === 'UNSUPPORTED_VERSION'));
+  const response = prepareSpec('f5-future-version', {...validSpec, capability_version: '2.0.0'});
+  assert.equal(response.status, 'error');
+  assert.match(response.warnings.join('\n'), /Unsupported F5 contract version/);
+});
+
+test('distinguishes semantic absence from malformed types', () => {
+  const missing = prepareSpec('f5-empty-objective', {...validSpec, objective: '   '});
+  assert.equal(missing.status, 'needs_input');
+  const malformed = prepareSpec('f5-wrong-objective-type', {...validSpec, objective: ['not', 'a', 'string']});
+  assert.equal(malformed.status, 'error');
+});
+
 test('returns the Core envelope and a planned client-side specification', () => {
   const response = prepareSpec('f5-ok', validSpec);
   assert.deepEqual(Object.keys(response).sort(), ['data', 'evidence_refs', 'next_actions', 'request_id', 'required_approvals', 'schema_version', 'status', 'warnings']);
@@ -58,20 +74,24 @@ test('returns the Core envelope and a planned client-side specification', () => 
   assert.equal(response.data?.capability_id, 'spec');
   assert.equal(response.data?.workflow_state, 'planned');
   assert.equal(response.data?.execution_location, 'client');
-  assert.deepEqual(response.data?.evidence_refs, ['client:brief']);
+  assert.equal('evidence_refs' in (response.data ?? {}), false);
+  assert.deepEqual(response.evidence_refs, ['client:brief']);
+  assert.deepEqual(response.next_actions, ['Review the specification with the client', 'Proceed to a separately approved build plan']);
   assert.deepEqual(response.required_approvals, []);
 });
 
-test('blocks sensitive operations and ignores unilateral approvals', () => {
-  const response = prepareSpec('f5-blocked', {
-    ...validSpec,
-    requested_operations: ['deploy production'],
-    approvals: ['human:approve:deploy production'],
-  });
-  assert.equal(response.status, 'blocked');
-  assert.equal(response.data?.workflow_state, 'blocked');
-  assert.deepEqual(response.required_approvals, ['human:approve:deploy production']);
-  assert.equal(response.data?.execution_location, 'client');
+test('blocks every requested operation and ignores unilateral approvals', () => {
+  for (const operation of ['wipe workspace', 'rollback release', 'rotate keys']) {
+    const response = prepareSpec(`f5-blocked-${operation}`, {
+      ...validSpec,
+      requested_operations: [operation],
+      approvals: [`human:approve:${operation}`],
+    });
+    assert.equal(response.status, 'blocked');
+    assert.equal(response.data?.workflow_state, 'blocked');
+    assert.deepEqual(response.required_approvals, [`human:approve:${operation}`]);
+    assert.equal(response.data?.execution_location, 'client');
+  }
 });
 
 test('keeps project proposals logically isolated without persistence claims', () => {

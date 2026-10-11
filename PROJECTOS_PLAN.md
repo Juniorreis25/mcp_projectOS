@@ -86,7 +86,7 @@ Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para pro
 - **Status:** Próxima fase de implementação; não iniciada.
 - **Atividades:** spec, build, review, test, debug, protect.
 - **Aceite:** Revisão, testes e bloqueio das operações sensíveis.
-- **F5.1:** Contratos versionados e função pura de especificação implementados na branch `feat/f5-core-contracts`; sem exposição MCP, execução externa, persistência ou alteração da F4. Aguardando revisão e integração.
+- **F5.1:** Contratos versionados e função pura de especificação implementados na branch `feat/f5-core-contracts`; sem exposição MCP, execução externa, persistência ou alteração da F4. Versões não suportadas, entradas semanticamente incompletas e qualquer operação solicitada são rejeitadas de forma determinística; autorização de execução permanece no cliente autorizado sob política própria. Aguardando revisão e integração.
 
 ### F6 — Catálogo completo
 - **Status:** Próxima fase planejada; não iniciada.
