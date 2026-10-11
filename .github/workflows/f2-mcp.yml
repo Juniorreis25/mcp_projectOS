@@ -1,8 +1,9 @@
 name: F2 MCP checks
 on:
-  push:
-    branches: ['f2/**']
   pull_request:
+    branches: [main, 'release/production']
+  push:
+    branches: [main, 'release/production']
 permissions:
   contents: read
 jobs:
@@ -38,5 +39,5 @@ jobs:
             -H 'MCP-Protocol-Version: 2025-06-18' \
             -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}')"
           test "$MCP_CODE" = "200"
-          grep -q 'projectos.list_skills' /tmp/projectos-tools.json
-          grep -q 'projectos.get_skill' /tmp/projectos-tools.json
+          grep -q 'projectos_list_skills' /tmp/projectos-tools.json
+          grep -q 'projectos_get_skill' /tmp/projectos-tools.json

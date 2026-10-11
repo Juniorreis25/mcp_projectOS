@@ -1,8 +1,9 @@
 name: F1 checks
 on:
   pull_request:
+    branches: [main, 'release/production']
   push:
-    branches: [main, 'f1/**']
+    branches: [main, 'release/production']
 permissions:
   contents: read
 jobs:
