@@ -1,8 +1,15 @@
 # ProjectOS — Plano-Mestre de Implementação
-Versão: 3.4 | Atualizado em: 2026-10-11 | Status: F0, F1, F2 e F3 concluídas; F4 tecnicamente homologada e aguardando integração autorizada; F5–F8 não iniciadas
+Versão: 3.5 | Atualizado em: 2026-10-11 | Status: F0, F1, F2, F3 e F4 concluídas; F5 e F6 são as próximas fases; F7 está em BACKLOG FUTURO; F8 permanece não iniciada
 
 ## Objetivo
 Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para projetos novos, existentes e retomadas.
+
+## Governança de branches e releases
+
+- `main` é a branch de integração e de geração de deployments Preview.
+- `release/production` é a Production Branch da Vercel.
+- O merge em `main` não promove código para Production.
+- Releases e promoções para Production exigem autorização explícita do Orquestrador.
 
 ## Fases e critérios de aceite
 
@@ -39,7 +46,7 @@ Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para pro
 - **Proteção e credenciais:** a configuração recomendada é `bearer_token_env_var = "PROJECTOS_MCP_TOKEN"` mais `env_http_headers = { "x-vercel-protection-bypass" = "VERCEL_AUTOMATION_BYPASS_SECRET" }`, sem valores em arquivos. Não foi gerado, alterado, revogado ou descriptografado segredo nesta F3.1.
 - **Preparação segura:** Protection Bypass for Automation é disponível no plano Hobby, mas a existência/valor de um segredo não foi consultada em claro. Foi preparado procedimento PowerShell com `Read-Host -AsSecureString`, variáveis somente no processo, verificação booleana e limpeza explícita. O Codex Desktop pode não herdar alterações de uma sessão PowerShell existente; os testes devem usar uma sessão/processo iniciado depois da injeção comprovada.
 - **Alternativa:** se o bypass não for compatível, avaliar OIDC de desenvolvimento da Vercel via `x-vercel-trusted-oidc-idp-token` ou ambiente MCP dedicado não produtivo. Não usar `vercel curl` como evidência de interoperabilidade Codex e não desativar SSO.
-- **Limitação de pipeline:** o projeto Vercel está ligado ao GitHub com `productionBranch: main` e criação de deployments habilitada; pushes em `main` geraram `target=production` automaticamente. Não houve publicação manual nesta F3.1. O projeto possui domínios de produção e o token `PROJECTOS_MCP_TOKEN` aparece apenas em `preview`; a governança do pipeline e a configuração de runtime de produção devem ser decididas antes de novos merges.
+- **Registro histórico da governança anterior:** o projeto Vercel utilizava `productionBranch: main` e pushes em `main` geravam deployments Production automaticamente. Esse comportamento foi corrigido posteriormente pela separação de `release/production`. O token `PROJECTOS_MCP_TOKEN` continua listado somente em Preview; a autenticação de Production permanece pendência.
 - **Política recomendada:** proteger `main`, exigir checks F1/F2 e usar promoção explícita para produção; manter as próximas atividades em branches de preview até a decisão de governança. Nenhuma configuração Vercel foi alterada.
 - **Critério de continuidade — registro histórico:** A–F da F3.1 foram considerados atendidos com base no relato verificável do Orquestrador; a pendência dos hooks é ambiental e não bloqueante. A execução da F3.2 foi autorizada posteriormente e está registrada abaixo.
 - **Próxima atividade — registro histórico:** F3.2 — VS Code, então recomendada para início controlado. A F3 foi encerrada somente após a evidência reportada, revisão e integração dos PRs.
@@ -48,51 +55,60 @@ Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para pro
 - **F3.2 — credenciais:** preferir configuração sem valores versionados; validar a diferença entre `.vscode/mcp.json` com inputs interativos e `.mcp.json`/`~/.copilot/mcp-config.json` usados diretamente pelo Agent Host. Inputs interativos podem não ser encaminhados ao Agent Host; essa compatibilidade deve ser comprovada antes dos testes.
 - **Integração:** PR #4 foi integrado por squash na branch da F3 no commit `20ad97bd943ecd4ef183da8071d0f9b93deaf723`; PR #3 foi integrado por squash na `main` no commit `ef79e16d716c224f1662a023d38ecf12ec3271fa`. O F1 pós-merge da `main` foi aprovado no [run 37980329313](https://github.com/Juniorreis25/mcp_projectOS/actions/runs/37980329313). O F2 checks do HEAD integrado antes do squash passaram no [run 37980226721](https://github.com/Juniorreis25/mcp_projectOS/actions/runs/37980226721); não houve execução F2 separada pós-merge porque o workflow não possui gatilho para `main`.
 - **Aceite F3:** Codex CLI, MCP nativo do VS Code e Codex integrado ao VS Code foram registrados separadamente em [docs/f3/f3.1-codex.md](docs/f3/f3.1-codex.md) e [docs/f3/f3.2-vscode-codex.md](docs/f3/f3.2-vscode-codex.md). As evidências de invocação dos clientes são reportadas pelo operador, não reexecutadas nesta sessão; as validações de código, smoke MCP e CI foram executadas/confirmadas conforme indicado acima.
-- **Resultado:** F3.1 e F3.2 aceitas tecnicamente com base nas evidências reportadas e na revisão/integração dos PRs. F4 permanece não iniciada.
+- **Resultado naquele marco histórico:** F3.1 e F3.2 foram aceitas tecnicamente com base nas evidências reportadas e na revisão/integração dos PRs; naquele momento, a F4 ainda não havia sido iniciada.
 
 ### F4 — Fluxo universal
-- **Status:** Tecnicamente homologada em 2026-10-11 na branch `feat/f4-universal-project-flow`, aguardando integração autorizada; não concluída na `main` e não liberada para produção.
+- **Status:** Concluída e integrada à `main` em 2026-10-11 pelo PR #5; homologada em Preview e não promovida para Production.
 - **Objetivo:** oferecer uma entrada universal read-only que selecione `new`, `existing` ou `recovery` usando somente contexto e evidências fornecidos pelo cliente.
 - **Contrato:** `projectos.start` é o identificador da skill; `projectos_start_workflow` é a tool MCP compatível. A resposta usa o envelope Core 1.0 e mantém a proposta em `data`, com `request_id`, evidências, aprovações e próximos passos no envelope.
 - **F4.1/F4.2:** a seleção de modo, o planejamento de projeto novo, a estrutura proposta, o plano incremental e os critérios de aceite retornam proposta sem criação ou modificação de arquivos; objetivos genéricos ou explicitamente ambíguos permanecem em `needs_input`.
-- **F4.3/F4.4:** análise existente e recuperação consomem somente snapshots/contextos enviados pelo cliente; lacunas retornam `needs_input` e fatos não são reconstruídos por suposição.
+- **F4.3/F4.4:** análise existente e recuperação consomem somente snapshots e contexto fornecidos pelo cliente autorizado. Evidência insuficiente retorna `needs_input`; fatos ausentes não são inventados. A ampliação da reconstrução contextual permanece possível em fases futuras.
 - **F4.5:** transições Core preservam estados válidos; operações sensíveis retornam `blocked`, risco crítico e aprovação humana requerida.
 - **F4.6:** a tool MCP mantém autenticação, Streamable HTTP, `structuredContent`/`content`, request IDs independentes e anotações read-only. Não há shell, escrita, migração, deploy ou acesso remoto ao workspace.
-- **Testes:** cobrem os três modos, ambiguidade, objetivo genérico, evidência insuficiente, transições, riscos, aprovações, isolamento, envelope, regressões de catálogo e ausência de primitivas de execução. A validação local do runtime e a homologação remota reportada estão registradas separadamente; F4 aguarda apenas a integração autorizada.
+- **Testes:** cobrem os três modos, ambiguidade, objetivo genérico, evidência insuficiente, transições, riscos, aprovações, isolamento, envelope, regressões de catálogo e ausência de primitivas de execução. A validação local do runtime, a homologação remota reportada e o CI pós-merge estão registrados separadamente.
 - **Validação local desta implementação:** `npm ci` na raiz e no aplicativo MCP, `npm run check`, typecheck, build Next.js, testes automatizados, smoke MCP local e `git diff --check` foram registrados com sucesso. A suíte raiz aprovou 25 testes; o smoke confirmou autenticação, DELETE não destrutivo, catálogo com três skills, envelope, annotations read-only e os estados `ok`, `needs_input` e `blocked`.
-- **PR e CI:** [PR draft #5](https://github.com/Juniorreis25/mcp_projectOS/pull/5) está no HEAD `c136b13d1444217500822445addccc69aa8c257c`. Os checks [F1 — run 38166745717](https://github.com/Juniorreis25/mcp_projectOS/actions/runs/38166745717), [F2 MCP — run 38166745726](https://github.com/Juniorreis25/mcp_projectOS/actions/runs/38166745726) e o status Vercel do commit estão aprovados. Não houve merge nem deploy manual.
-- **Aceite:** só concluir após `npm ci`, checks raiz, instalação/testes do app MCP, typecheck, build Next.js, smoke, CI aprovado, revisão do PR e CI pós-merge aplicável.
+- **Homologação histórica:** a correção do classificador foi reportada como validada no Preview `dpl_CoXcTyZxoHN2PVYEmVZ4ZcB1pNZJ`, commit `c136b13d1444217500822445addccc69aa8c257c`, incluindo os modos `new`, `existing` e `recovery`, respostas `needs_input` e bloqueios de operações sensíveis.
+- **Integração final:** [PR #5](https://github.com/Juniorreis25/mcp_projectOS/pull/5) foi integrado por squash na `main`, resultando no commit `32f7947ab5681eb6cdde1ef94e5924ca9e20af62`.
+- **CI pós-merge:** [F1 — run 38171972136](https://github.com/Juniorreis25/mcp_projectOS/actions/runs/38171972136) e [F2 MCP — run 38171972091](https://github.com/Juniorreis25/mcp_projectOS/actions/runs/38171972091) passaram no commit final.
+- **Preview pós-merge:** o deployment `dpl_6BwiKeF2FGKWCjMRztG7TC4oAr3k` ficou READY no commit `32f7947`, com target Preview.
+- **Production:** a homologação funcional foi realizada em Preview. A autenticação MCP de Production ainda não foi comprovada; portanto, a F4 não autoriza promoção automática ou release.
+- **Aceite:** critérios técnicos atendidos após a integração e aprovação do CI pós-merge. F4 não foi promovida para Production.
+- **Isolamento:** o isolamento por `project_id` é lógico e contratual dentro da proposta e da resposta; não representa persistência ou isolamento de estado entre sessões.
+- **Limites:** o servidor MCP não acessa diretamente o filesystem ou workspace do cliente. Implementação e execução permanecem no cliente autorizado.
 - **Revisão de segurança:** nenhum P0/P1 foi encontrado. A homologação MCP nativa remota foi reportada como aprovada no Preview correto, com proteção Vercel ativa. P3 remanescentes: formalizar a política de operações sensíveis em F5 e tratar riscos herdados da F2.
 - **Divergência `needs_input`:** o payload remoto exato não foi localizado no repositório, histórico ou comentários disponíveis; foram criados fixtures explícitos para objetivo genérico e ambiguidade textual. A causa foi classificada como defeito de implementação com lacuna de especificação operacional: qualquer `goal` não vazio era aceito como `new`. A correção exige objetivo não ambíguo e rejeita padrões genéricos conhecidos, preservando objetivos específicos.
 - **Validação da correção — 2026-10-11:** `npm run check` passou com 25 testes; typecheck, build Next.js e `npm test --prefix apps/mcp-server`/smoke MCP local passaram. A homologação remota nativa foi reportada como aprovada no deployment Preview `dpl_CoXcTyZxoHN2PVYEmVZ4ZcB1pNZJ`, commit `c136b13d1444217500822445addccc69aa8c257c`, URL imutável [projectos-jz034xvc6-juniors-projects-21c34634.vercel.app](https://projectos-jz034xvc6-juniors-projects-21c34634.vercel.app), endpoint `/mcp`. As chamadas não foram reexecutadas nesta sessão; os request IDs originais não foram preservados na cópia local e não foram inventados.
 - **Aceite técnico reportado:** oito cenários remotos foram reportados como aprovados: `ok/new`, `ok/existing`, `ok/recovery`, três respostas `needs_input` para contexto insuficiente/ambíguo/contraditório e duas respostas `blocked` para operações sensíveis e aprovações unilaterais. `projectos_list_skills` e `projectos_get_skill` também foram reportadas como validadas. A matriz detalhada e a limitação dos request IDs estão em `docs/f4/universal-project-flow.md`.
-- **Integração:** o PR [#5](https://github.com/Juniorreis25/mcp_projectOS/pull/5) permanece aberto e em draft, com HEAD `c136b13d1444217500822445addccc69aa8c257c`. O CI F1/F2 e o status Vercel desse commit estão aprovados; nenhuma integração na `main` foi autorizada ou executada nesta etapa.
-- **Distinção de evidência:** a homologação remota e seus oito estados são evidência reportada pelo Orquestrador; as validações locais anteriores permanecem separadas. A alteração desta etapa é somente documental e não cria um novo HEAD de runtime homologado.
+- **Registro pré-merge:** o PR [#5](https://github.com/Juniorreis25/mcp_projectOS/pull/5) esteve em draft no HEAD `c136b13d1444217500822445addccc69aa8c257c`, com CI F1/F2 e status Vercel aprovados; esse registro antecede a integração final.
+- **Distinção de evidência:** a homologação remota e seus oito estados são evidência reportada pelo Orquestrador; as validações locais, o CI pré-merge e o CI pós-merge permanecem separados. As chamadas MCP autenticadas não foram reexecutadas após o merge nesta sessão.
 
 ### F5 — Execução e garantia
-- **Status:** Não iniciada.
+- **Status:** Próxima fase de implementação; não iniciada.
 - **Atividades:** spec, build, review, test, debug, protect.
 - **Aceite:** Revisão, testes e bloqueio das operações sensíveis.
 
 ### F6 — Catálogo completo
-- **Status:** Não iniciada.
+- **Status:** Próxima fase planejada; não iniciada.
 - **Atividades:** idea, release, memory, status, audit; total de 14 skills versionadas.
 - **Aceite:** Catálogo verificado e versões fixáveis por projeto.
 
 ### F7 — Persistência e continuidade
-- **Status:** Não iniciada.
-- **Atividades:** armazenamento de estados, retomada, isolamento.
-- **Aceite:** Retomada entre clientes/servidores e isolamento testados.
+- **Status:** BACKLOG FUTURO.
+- **Decisão:** F7 não é dependência obrigatória da F4, da F8 ou da release 1.0.
+- **Continuidade atual:** projetos podem ser analisados e retomados usando código, documentação, histórico, decisões e contexto fornecidos pelo usuário e pelo cliente autorizado.
+- **Limites:** o servidor não acessa diretamente o filesystem do cliente, não inventa fatos ausentes e retorna `needs_input` quando faltarem evidências.
+- **Evolução futura:** persistência entre sessões, reconstrução contextual ampliada e armazenamento compartilhado poderão ser avaliados em fase posterior, mediante autorização específica.
 
 ### F8 — Homologação e release 1.0
 - **Status:** Não iniciada.
 - **Atividades:** Testes ponta a ponta, segurança, rollback e publicação.
-- **Aceite:** Evidências, aprovação e release registrados.
+- **Aceite:** Evidências, aprovação e release registrados. A F8 não depende da implementação da F7.
 
 ## Política de acompanhamento
 Após cada fase ou marco relevante, registrar data, evidências verificáveis (commit, PR, workflow), testes, bloqueios e próxima ação. Não marcar fase concluída sem aceite verificável.
 
 ## Histórico
+- 2026-10-11 — v3.5: F4 integrada à `main` pelo PR #5, squash commit `32f7947`; CI F1/F2 pós-merge aprovado; Preview pós-merge READY; `release/production` preservada como Production Branch; F7 classificada como BACKLOG FUTURO e sem dependência obrigatória para F8 ou release 1.0.
 - 2026-10-11 — v3.4: homologação MCP nativa da F4 reportada no deployment Preview `dpl_CoXcTyZxoHN2PVYEmVZ4ZcB1pNZJ`, commit `c136b13`; oito cenários, catálogo e correção da ambiguidade registrados como aprovados; request IDs não retidos no material local; F4 aguarda integração autorizada e não foi marcada concluída.
 - 2026-10-11 — v3.3: investigação da divergência `needs_input`; payload remoto exato indisponível, fixtures novas reproduziram a seleção indevida de `new`; correção mínima para objetivos genéricos/ambíguos, dois testes de regressão e checks locais aprovados; F4 permanece bloqueada aguardando CI do novo HEAD e homologação remota.
 - 2026-10-09 — v3.2: F4 iniciada na branch `feat/f4-universal-project-flow`; contrato Core, skill `projectos.start`, tool `projectos_start_workflow`, modos new/existing/recovery, bloqueio de operações sensíveis, catálogo, documentação e testes implementados; F4 aguarda revisão, PR, CI e homologação.
