@@ -30,6 +30,28 @@ test('new project produces a planned proposal', () => {
   assert.deepEqual(result.proposal.proposed_structure, ['README.md', 'docs/', 'src/', 'tests/']);
 });
 
+test('generic new goal without enough specificity returns needs_input', () => {
+  const result = startWorkflow({
+    project_id: 'generic-new-fixture',
+    goal: 'Start a project',
+    evidence: [{ref: 'fixture:generic-goal', summary: 'New fixture with a generic objective and no supporting scope'}],
+  });
+  assert.equal(result.status, 'needs_input');
+  assert.equal(result.proposal.mode, 'new');
+  assert.match(result.proposal.decisions_pending.join('\n'), /specific goal or scope/);
+});
+
+test('explicitly ambiguous new goal returns needs_input', () => {
+  const result = startWorkflow({
+    project_id: 'ambiguous-new-fixture',
+    goal: 'I have a project but I am not sure what to do yet',
+    evidence: [{ref: 'fixture:ambiguous-goal', summary: 'New fixture with explicit uncertainty in the objective'}],
+  });
+  assert.equal(result.status, 'needs_input');
+  assert.equal(result.proposal.mode, 'new');
+  assert.match(result.proposal.decisions_pending.join('\n'), /unambiguous goal/);
+});
+
 test('existing project uses only the supplied snapshot', () => {
   const result = startWorkflow(existingInput());
   assert.equal(result.status, 'ok');

@@ -94,6 +94,24 @@ function cleanList(values: string[] | undefined): string[] {
   return (values ?? []).map(value => value.trim()).filter(Boolean);
 }
 
+function normalizedText(value: string): string {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+function hasAmbiguousGoal(goal: string | undefined): boolean {
+  const normalized = normalizedText(clean(goal) ?? '');
+  return /\b(ambig|unclear|uncertain|unsure|not sure|dont know|do not know|generic|vague|indefin|incert|nao sei)\b/.test(normalized);
+}
+
+function hasGenericGoal(goal: string | undefined): boolean {
+  const normalized = normalizedText(clean(goal) ?? '');
+  return [
+    /^(start|create|build|make|plan|work on)\s+(a|an|the|my|new)?\s*(project|app|application|system|solution|workflow)$/,
+    /^(do|make|build)\s+(something|anything)$/,
+    /^(iniciar|comecar|criar|fazer|planejar|desenvolver)\s+(um|uma|o|a|meu|minha|novo|nova)?\s*(projeto|aplicacao|sistema|solucao|fluxo)$/,
+  ].some(pattern => pattern.test(normalized));
+}
+
 function evidenceRefs(input: StartWorkflowInput): string[] {
   return (input.evidence ?? []).map(item => item.ref.trim()).filter(Boolean);
 }
@@ -159,6 +177,8 @@ function modeRequirements(input: StartWorkflowInput, mode: Mode): string[] {
   const missing: string[] = [];
   if (!(input.evidence ?? []).some(item => clean(item.ref) && clean(item.summary))) missing.push('client evidence');
   if (mode === 'new' && !clean(input.goal)) missing.push('goal');
+  if (mode === 'new' && hasAmbiguousGoal(input.goal)) missing.push('unambiguous goal');
+  if (mode === 'new' && !hasAmbiguousGoal(input.goal) && hasGenericGoal(input.goal)) missing.push('specific goal or scope');
   if ((mode === 'existing' || mode === 'recovery') && !clean(input.project_id)) missing.push('project_id');
   if (mode === 'existing') {
     const snapshot = input.project_snapshot;

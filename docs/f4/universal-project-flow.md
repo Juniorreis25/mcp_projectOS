@@ -1,6 +1,6 @@
 # F4 — Fluxo Universal de Projetos
 
-Status: em andamento — implementação inicial na branch `feat/f4-universal-project-flow`.
+Status: em andamento — implementação inicial na branch `feat/f4-universal-project-flow`; aceite técnico ainda bloqueado.
 
 ## Objetivo
 
@@ -39,8 +39,9 @@ O servidor não trata nomes de arquivos, caminhos, comandos ou operações como 
 1. Um `requested_mode` compatível com as evidências é aceito.
 2. Um `recovery` sem modo explícito seleciona `recovery`.
 3. Um `project_snapshot` sem modo explícito seleciona `existing`.
-4. Um objetivo sem snapshot/recovery seleciona `new`.
-5. Contexto conflitante ou ausência de evidências retorna `needs_input`.
+4. Um objetivo específico, sem snapshot/recovery e sem sinal explícito de incerteza, seleciona `new`.
+5. Um objetivo genérico ou com sinal explícito de incerteza retorna `needs_input` até que o cliente forneça escopo ou decisão suficiente.
+6. Contexto conflitante ou ausência de evidências retorna `needs_input`.
 
 O resultado nunca inventa fatos sobre o projeto. Lacunas são registradas em `decisions_pending`, `next_actions` e riscos.
 
@@ -64,6 +65,16 @@ Os testes Core cobrem:
 - aprovações obrigatórias;
 - isolamento lógico por `project_id`;
 - proposta read-only e ausência de primitivas de execução.
+
+## Divergência de homologação e resolução — 2026-10-11
+
+O payload exato da homologação remota que apresentou `status: ok` para um objetivo genérico não foi localizado no repositório, no histórico do PR #5 ou nos comentários disponíveis. A reprodução foi feita com fixtures novas, identificadas como `fixture:generic-goal` e `fixture:ambiguous-goal`.
+
+Na implementação anterior, qualquer `goal` não vazio selecionava `new`, inclusive `Start a project` e `I have a project but I am not sure what to do yet`. Isso contrariava o requisito de retornar `needs_input` para ambiguidade, embora a documentação dissesse apenas que um objetivo sem snapshot/recovery selecionava `new`.
+
+A correção mínima adiciona duas verificações somente para `new`: sinais textuais explícitos de incerteza exigem um objetivo não ambíguo; padrões de objetivo genérico exigem objetivo mais específico ou escopo. Objetivos específicos, como `Build a catalog` com escopo e evidência, continuam `ok/new`. Não houve alteração no transporte MCP, autenticação, envelope, permissões ou fronteira read-only.
+
+Os fixtures de regressão confirmaram `needs_input` para objetivo genérico e ambiguidade explícita. A homologação remota ainda não foi repetida nesta rodada.
 
 O smoke MCP cobre catálogo com três skills, descoberta das três tools, `projectos.start`, envelope, request IDs, proposta válida e resposta `blocked` para deploy.
 

@@ -1,5 +1,5 @@
 # ProjectOS — Plano-Mestre de Implementação
-Versão: 3.2 | Atualizado em: 2026-10-09 | Status: F0, F1, F2 e F3 concluídas; F4 em andamento; F5–F8 não iniciadas
+Versão: 3.3 | Atualizado em: 2026-10-11 | Status: F0, F1, F2 e F3 concluídas; F4 em andamento; F5–F8 não iniciadas
 
 ## Objetivo
 Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para projetos novos, existentes e retomadas.
@@ -54,15 +54,17 @@ Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para pro
 - **Status:** Em andamento, iniciada em 2026-10-09 pela branch `feat/f4-universal-project-flow`; F4.1–F4.6 implementadas nesta branch, aguardando revisão, CI, PR e homologação.
 - **Objetivo:** oferecer uma entrada universal read-only que selecione `new`, `existing` ou `recovery` usando somente contexto e evidências fornecidos pelo cliente.
 - **Contrato:** `projectos.start` é o identificador da skill; `projectos_start_workflow` é a tool MCP compatível. A resposta usa o envelope Core 1.0 e mantém a proposta em `data`, com `request_id`, evidências, aprovações e próximos passos no envelope.
-- **F4.1/F4.2:** a seleção de modo, o planejamento de projeto novo, a estrutura proposta, o plano incremental e os critérios de aceite retornam proposta sem criação ou modificação de arquivos.
+- **F4.1/F4.2:** a seleção de modo, o planejamento de projeto novo, a estrutura proposta, o plano incremental e os critérios de aceite retornam proposta sem criação ou modificação de arquivos; objetivos genéricos ou explicitamente ambíguos permanecem em `needs_input`.
 - **F4.3/F4.4:** análise existente e recuperação consomem somente snapshots/contextos enviados pelo cliente; lacunas retornam `needs_input` e fatos não são reconstruídos por suposição.
 - **F4.5:** transições Core preservam estados válidos; operações sensíveis retornam `blocked`, risco crítico e aprovação humana requerida.
 - **F4.6:** a tool MCP mantém autenticação, Streamable HTTP, `structuredContent`/`content`, request IDs independentes e anotações read-only. Não há shell, escrita, migração, deploy ou acesso remoto ao workspace.
-- **Testes:** cobrem os três modos, ambiguidade, evidência insuficiente, transições, riscos, aprovações, isolamento, envelope, regressões de catálogo e ausência de primitivas de execução. A validação final e CI ainda estão pendentes nesta branch.
+- **Testes:** cobrem os três modos, ambiguidade, objetivo genérico, evidência insuficiente, transições, riscos, aprovações, isolamento, envelope, regressões de catálogo e ausência de primitivas de execução. A validação final e CI ainda estão pendentes nesta branch.
 - **Validação local desta implementação:** `npm ci` na raiz e no aplicativo MCP, `npm run check`, typecheck, build Next.js, testes automatizados, smoke MCP local e `git diff --check` concluídos com sucesso em 2026-10-09. A suíte raiz aprovou 23 testes; o smoke confirmou autenticação, DELETE não destrutivo, catálogo com três skills, envelope, annotations read-only e os estados `ok`, `needs_input` e `blocked`. CI do commit de testes e homologação remota permanecem registrados separadamente.
 - **PR e CI:** [PR draft #5](https://github.com/Juniorreis25/mcp_projectOS/pull/5), commits `c2f5798` (runtime/testes), `f80e77f` (documentação), `e897819` (evidência final) e `8ce919b` (cobertura adversarial). Os workflows [F1 checks — run 37983178888](https://github.com/Juniorreis25/mcp_projectOS/actions/runs/37983178888) e [F2 MCP checks — run 37983178817](https://github.com/Juniorreis25/mcp_projectOS/actions/runs/37983178817) concluíram com sucesso para o commit `8ce919b`. Não houve merge, deploy ou homologação remota autenticada.
 - **Aceite:** só concluir após `npm ci`, checks raiz, instalação/testes do app MCP, typecheck, build Next.js, smoke, CI aprovado, revisão do PR e CI pós-merge aplicável.
 - **Revisão de segurança:** nenhum P0/P1 foi encontrado. A homologação remota autenticada está bloqueada pela ausência segura do token Preview nesta sessão; a proteção Vercel e o deployment do HEAD foram confirmados. P3 remanescentes: formalizar a política de operações sensíveis em F5 e tratar riscos herdados da F2.
+- **Divergência `needs_input`:** o payload remoto exato não foi localizado no repositório, histórico ou comentários disponíveis; foram criados fixtures explícitos para objetivo genérico e ambiguidade textual. A causa foi classificada como defeito de implementação com lacuna de especificação operacional: qualquer `goal` não vazio era aceito como `new`. A correção exige objetivo não ambíguo e rejeita padrões genéricos conhecidos, preservando objetivos específicos.
+- **Validação da correção — 2026-10-11:** `npm run check` passou com 25 testes; typecheck, build Next.js e `npm test --prefix apps/mcp-server`/smoke MCP local passaram. A homologação remota não foi repetida; F4 continua aberta e não concluída.
 
 ### F5 — Execução e garantia
 - **Status:** Não iniciada.
@@ -88,6 +90,7 @@ Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para pro
 Após cada fase ou marco relevante, registrar data, evidências verificáveis (commit, PR, workflow), testes, bloqueios e próxima ação. Não marcar fase concluída sem aceite verificável.
 
 ## Histórico
+- 2026-10-11 — v3.3: investigação da divergência `needs_input`; payload remoto exato indisponível, fixtures novas reproduziram a seleção indevida de `new`; correção mínima para objetivos genéricos/ambíguos, dois testes de regressão e checks locais aprovados; F4 permanece bloqueada aguardando CI do novo HEAD e homologação remota.
 - 2026-10-09 — v3.2: F4 iniciada na branch `feat/f4-universal-project-flow`; contrato Core, skill `projectos.start`, tool `projectos_start_workflow`, modos new/existing/recovery, bloqueio de operações sensíveis, catálogo, documentação e testes implementados; F4 aguarda revisão, PR, CI e homologação.
 - 2026-10-09 — v3.1: PR #4 integrado por squash em `20ad97b`; PR #3 integrado por squash na `main` em `ef79e16`; F1 pós-merge `37980329313` aprovado; F2 pré-merge do HEAD final `37980226721` aprovado, sem workflow F2 pós-merge por ausência de gatilho em `main`; F3 encerrada tecnicamente com evidências de Codex CLI, MCP nativo do VS Code e Codex integrado reportadas pelo operador; escopo da F4 preparado sem início.
 - 2026-10-09 — v2.7: Orquestrador reportou teste real Codex aprovado para handshake, catálogo, discover, plan, envelope Core e limites read-only; F3.1 tecnicamente validada; duas falhas de hook global Impeccable diagnosticadas como pendência não bloqueante; procedimento F3.2 VS Code preparado sem execução.
