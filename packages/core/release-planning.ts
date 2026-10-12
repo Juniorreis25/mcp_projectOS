@@ -86,6 +86,30 @@ export interface ReleaseData {
 
 export type ReleaseEnvelope = Envelope<ReleaseData | null>;
 
+type ReleaseRiskLevel = Extract<Risk, 'moderate' | 'critical'>;
+type ReleaseRiskCategory = 'destructive' | 'credentials' | 'access' | 'migration' | 'production' | 'inconsistency' | 'availability';
+type ReleaseRiskSource = 'target_environment' | 'scope' | 'planned_changes' | 'declared_risks' | 'dependencies' | 'decisions_pending';
+
+interface RiskSignal {
+  key: string;
+  category: ReleaseRiskCategory;
+  level: ReleaseRiskLevel;
+  source: ReleaseRiskSource;
+}
+
+interface RiskEntry {
+  key: string;
+  level: ReleaseRiskLevel;
+  summary: string;
+}
+
+interface PlanAnalysis {
+  plan: ReleasePlan;
+  riskEntries: RiskEntry[];
+  criticalRisk: boolean;
+  materialBlockers: string[];
+}
+
 interface ValidationIssue {
   path: string;
   code: 'INVALID_TYPE' | 'MISSING_REQUIRED' | 'INVALID_VALUE' | 'UNSUPPORTED_VERSION' | 'UNKNOWN_FIELD';
@@ -112,6 +136,14 @@ const secretPatterns: readonly RegExp[] = [
   /ignore\s+all\s+previous\s+instructions[^.\n]*/gi,
 ];
 const contradictionPattern = /\b(?:contradict(?:s|ory|ion)?|conflict(?:s|ing)?|inconsistent|incompat(?:ible|ibility))\b|contradi[cç][aã]o|incompat[ií]vel|conflitante/i;
+const productionPattern = /\b(?:production|prod\b|live|release\/production|produ[cç][aã]o|ao vivo)\b/i;
+const destructivePattern = /\b(?:delete|delet(?:e|ion)|remove|drop|destroy|purge|wipe|erase|truncate|irreversible|data loss|excluir|deletar|remover|destruir|apagar|purgar|limpar|irrevers[ií]vel|perda de dados)\b/i;
+const credentialPattern = /\b(?:rotate|rotation|expose|exposure|revoke|credential|credentials|secret|secrets|token|password|passwd|api key|access key|rotate keys|rotacionar|rota[cç][aã]o|expor|exposi[cç][aã]o|credencial|segredo|senha|chave de api)\b/i;
+const accessPattern = /\b(?:admin|administrator|permission|permissions|privilege|privileges|role|iam|acl|access control|elevat(?:e|ion)|permiss[aã]o|privil[eé]gio|administrador|controle de acesso|elevar acesso)\b/i;
+const migrationPattern = /\b(?:migrat(?:e|ion)|schema|database|db\b|data migration|migra[cç][aã]o|esquema|banco de dados)\b/i;
+const availabilityPattern = /\b(?:downtime|availability|performance|latency|breaking change|compatibility|degrada[cç][aã]o|indisponibilidade|desempenho|lat[eê]ncia|mudan[cç]a incompat[ií]vel|compatibilidade)\b/i;
+const materialDependencyPattern = /\b(?:blocked|blocking|unresolved|missing|not available|unavailable|pending|required|depends on|bloquead[ao]|bloqueante|incompleto|ausente|indispon[ií]vel|pendente|necess[aá]ri[ao]|depende de|aguardando)\b/i;
+const materialDecisionPattern = /\b(?:approval|authorize|authorization|security|production|credential|migration|rollback|aprova[cç][aã]o|autoriza[cç][aã]o|seguran[cç]a|produ[cç][aã]o|credencial|migra[cç][aã]o|rollback)\b/i;
 const safeIssuePathPatterns: readonly RegExp[] = [
   /^(?:capability_id|capability_version|project_id|proposed_version|scope|planned_changes|declared_risks|acceptance_criteria|test_results|evidence|dependencies|decisions_pending|rollback_strategy|target_environment|requested_operations|approvals)$/,
   /^(?:scope|planned_changes|declared_risks|acceptance_criteria|dependencies|decisions_pending|requested_operations|approvals)\[\d{1,3}\]$/,
@@ -333,6 +365,71 @@ function contradictory(request: ReleaseRequest): boolean {
   return request.evidence.some(item => contradictionPattern.test(item.summary));
 }
 
+function signalForText(text: string, source: ReleaseRiskSource, index: number): RiskSignal[] {
+  const signals: RiskSignal[] = [];
+  const indicators: Array<[ReleaseRiskCategory, RegExp, ReleaseRiskLevel]> = [
+    ['destructive', destructivePattern, 'critical'],
+    ['credentials', credentialPattern, 'critical'],
+    ['access', accessPattern, 'critical'],
+    ['migration', migrationPattern, 'critical'],
+    ['production', productionPattern, 'critical'],
+    ['availability', availabilityPattern, 'moderate'],
+  ];
+  for (const [category, pattern, level] of indicators) {
+    if (pattern.test(text)) signals.push({key: `${source}-${index}-${category}`, category, level, source});
+  }
+  return signals;
+}
+
+function riskAnalysis(request: ReleaseRequest): {entries: RiskEntry[]; criticalRisk: boolean; materialBlockers: string[]} {
+  const signals: RiskSignal[] = [];
+  const sourceValues: Array<{source: ReleaseRiskSource; values: readonly string[]}> = [
+    {source: 'scope', values: request.scope},
+    {source: 'planned_changes', values: request.planned_changes},
+    {source: 'declared_risks', values: request.declared_risks},
+    {source: 'dependencies', values: request.dependencies},
+    {source: 'decisions_pending', values: request.decisions_pending},
+  ];
+  for (const {source, values} of sourceValues) {
+    values.forEach((value, index) => signals.push(...signalForText(value, source, index)));
+  }
+  if (request.target_environment === 'production') {
+    signals.push({key: 'target_environment-production', category: 'production', level: 'critical', source: 'target_environment'});
+  }
+  const containsProductionIndicator = sourceValues.some(({values}) => values.some(value => productionPattern.test(value)));
+  if (request.target_environment === 'preview' && containsProductionIndicator) {
+    signals.push({key: 'target-environment-inconsistency', category: 'inconsistency', level: 'critical', source: 'target_environment'});
+  }
+
+  const uniqueSignals = [...new Map(signals.map(signal => [signal.key, signal])).values()]
+    .sort((left, right) => left.key.localeCompare(right.key));
+  const entries: RiskEntry[] = uniqueSignals.map(signal => ({
+    key: signal.key,
+    level: signal.level,
+    summary: `Heuristic ${signal.category} indicator detected in client-provided ${signal.source}; independent confirmation is required`,
+  }));
+  request.declared_risks.forEach((risk, index) => {
+    const riskSignals = signalForText(risk, 'declared_risks', index);
+    const level: ReleaseRiskLevel = riskSignals.some(signal => signal.level === 'critical') ? 'critical' : 'moderate';
+    entries.push({key: `declared-risk-${index}`, level, summary: `Client-declared risk: ${sanitizeText(risk)}`});
+  });
+
+  const materialBlockers: string[] = [];
+  if (request.dependencies.some(dependency => materialDependencyPattern.test(dependency))) {
+    materialBlockers.push('A material dependency remains unresolved and requires client resolution');
+  }
+  if (request.decisions_pending.some(decision => materialDecisionPattern.test(decision))) {
+    materialBlockers.push('A material release decision remains pending and requires client resolution');
+  }
+  const deduplicatedEntries = [...new Map(entries.map(entry => [entry.key, entry])).values()]
+    .sort((left, right) => left.key.localeCompare(right.key));
+  return {
+    entries: deduplicatedEntries,
+    criticalRisk: deduplicatedEntries.some(entry => entry.level === 'critical'),
+    materialBlockers,
+  };
+}
+
 function semanticGaps(request: ReleaseRequest): string[] {
   const gaps: string[] = [];
   if (request.scope.length === 0) gaps.push('Define the release scope');
@@ -346,12 +443,13 @@ function semanticGaps(request: ReleaseRequest): string[] {
   return gaps;
 }
 
-function buildPlan(request: ReleaseRequest): ReleasePlan {
+function buildPlan(request: ReleaseRequest): PlanAnalysis {
   const gaps = semanticGaps(request);
   const contradictionFound = contradictory(request);
   const failedTests = request.test_results.filter(test => test.status === 'failed' || test.status === 'blocked');
   const unverifiedTests = request.test_results.filter(test => test.status === 'skipped' || test.status === 'not_run' || test.evidence_refs.length === 0);
   const productionTarget = request.target_environment === 'production';
+  const risks = riskAnalysis(request);
   const criteria: ReleaseCriterion[] = request.acceptance_criteria
     .map((statement, index) => ({id: `criterion-${index + 1}`, statement: sanitizeText(statement), status: 'not_verified' as const, evidence_refs: []}))
     .sort((left, right) => left.id.localeCompare(right.id));
@@ -370,16 +468,13 @@ function buildPlan(request: ReleaseRequest): ReleasePlan {
     ...(failedTests.length > 0 ? ['One or more client-declared tests failed or were blocked'] : []),
     ...(unverifiedTests.length > 0 ? ['One or more tests are skipped, not run, or lack traceable evidence'] : []),
     ...(productionTarget ? ['Production readiness requires separate release authorization and operational verification'] : []),
+    ...(risks.criticalRisk ? ['Sensitive or Production indicators were detected heuristically; confirm scope and authorization in the client'] : []),
+    ...risks.materialBlockers,
   ];
-  const readiness: ReleaseReadiness = gaps.length > 0 || contradictionFound || failedTests.length > 0 || unverifiedTests.length > 0 || productionTarget
+  const readiness: ReleaseReadiness = gaps.length > 0 || contradictionFound || failedTests.length > 0 || unverifiedTests.length > 0 || productionTarget || risks.criticalRisk || risks.materialBlockers.length > 0
     ? (contradictionFound || unverifiedTests.length > 0 || request.evidence.length === 0 ? 'insufficient_evidence' : 'not_ready')
     : 'ready_for_client_review';
-  const risks = sortText([
-    ...request.declared_risks,
-    ...(failedTests.length > 0 ? ['Client-declared release tests include failures or blocked cases'] : []),
-    ...(productionTarget ? ['Target is Production; Preview readiness does not certify Production'] : []),
-  ]);
-  return {
+  const plan: ReleasePlan = {
     proposed_version: request.proposed_version,
     scope: sortText(request.scope),
     planned_changes: sortText(request.planned_changes),
@@ -388,7 +483,7 @@ function buildPlan(request: ReleaseRequest): ReleasePlan {
     criteria,
     test_assessments: testAssessments,
     rollback_strategy: sanitizeText(request.rollback_strategy),
-    risks,
+    risks: risks.entries.map(entry => entry.summary),
     evidence_gaps: sortText(evidenceGaps),
     pre_publication_checks: [
       'Verify all acceptance criteria in the authorized client',
@@ -408,24 +503,28 @@ function buildPlan(request: ReleaseRequest): ReleasePlan {
       'A ready_for_client_review assessment is not authorization to release or certify Production',
     ],
   };
+  return {plan, riskEntries: risks.entries, criticalRisk: risks.criticalRisk, materialBlockers: risks.materialBlockers};
 }
 
-function dataFor(request: ReleaseRequest, plan: ReleasePlan): ReleaseData {
+function dataFor(request: ReleaseRequest, analysis: PlanAnalysis): ReleaseData {
+  const {plan, riskEntries, criticalRisk, materialBlockers} = analysis;
   return {
     capability_id: 'release',
     capability_version: request.capability_version,
     project_id: request.project_id,
     workflow_state: 'planned',
     proposal_or_findings: plan,
-    risks: plan.risks.map((summary, index) => ({
+    risks: riskEntries.map((entry, index) => ({
       id: `release-risk-${index + 1}`,
-      level: /production|failed|blocked/i.test(summary) ? 'critical' : 'moderate',
-      summary,
+      level: entry.level,
+      summary: entry.summary,
       mitigation: 'Review and resolve this risk in the authorized client before any release decision',
     })),
     decisions_pending: [
       'Human review and release approval remain pending',
       ...(request.target_environment === 'production' ? ['Confirm separate Production authorization and verification'] : []),
+      ...(criticalRisk ? ['Resolve heuristic sensitive-risk indicators before any release decision'] : []),
+      ...materialBlockers,
       ...sortText(request.decisions_pending),
     ],
     execution_location: 'client',
@@ -454,17 +553,18 @@ export function prepareRelease(requestId: string, input: unknown): ReleaseEnvelo
   const request = validation.value;
   if ((request.requested_operations ?? []).length > 0) return blockedResponse(requestId, request);
 
-  const plan = buildPlan(request);
-  const semanticNeedsInput = plan.evidence_gaps.length > 0;
+  const analysis = buildPlan(request);
+  const semanticNeedsInput = analysis.plan.evidence_gaps.length > 0;
   const status = semanticNeedsInput ? 'needs_input' : 'ok';
-  const data = dataFor(request, plan);
+  const data = dataFor(request, analysis);
   return envelope(requestId, status, data, {
     evidence_refs: evidenceRefs(request),
     required_approvals: ['human:release-review'],
     warnings: [
       'Client-provided evidence and test results are not independently verified',
       ...(request.target_environment === 'production' ? ['Production readiness is not certified by this Preview/read-only plan'] : []),
+      ...(analysis.criticalRisk ? ['Sensitive-risk classification is heuristic and requires client confirmation'] : []),
     ],
-    next_actions: plan.client_next_steps,
+    next_actions: analysis.plan.client_next_steps,
   });
 }

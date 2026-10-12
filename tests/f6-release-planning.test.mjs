@@ -73,6 +73,64 @@ test('does not certify Production from a Preview-style plan', () => {
   assert.match(JSON.stringify(response), /Production readiness/);
 });
 
+test('classifies irreversible data deletion as critical even when declared tests passed', () => {
+  const response = prepareRelease('release-delete', request({planned_changes: ['Purge irreversible customer data']}));
+  assert.equal(response.status, 'needs_input');
+  assert.equal(response.data?.proposal_or_findings.readiness, 'not_ready');
+  assert.ok(response.data?.risks.some(risk => risk.level === 'critical'));
+  assert.match(JSON.stringify(response), /destructive|Sensitive-risk/);
+});
+
+test('classifies credential exposure and rotation as critical without echoing secrets', () => {
+  const sensitiveValue = 'Authorization: Bearer ghp_release_sensitive_123';
+  const response = prepareRelease('release-credentials', request({
+    planned_changes: [`Rotate production credentials and expose ${sensitiveValue} to the deploy step`],
+    declared_risks: ['Credential rotation requires security review'],
+  }));
+  assert.equal(response.status, 'needs_input');
+  assert.ok(response.data?.risks.some(risk => risk.level === 'critical'));
+  assert.doesNotMatch(JSON.stringify(response), /ghp_release_sensitive_123/);
+});
+
+test('classifies administrative access and destructive migrations conservatively', () => {
+  const access = prepareRelease('release-access', request({planned_changes: ['Grant administrator permissions to the release role']}));
+  const migration = prepareRelease('release-migration', request({planned_changes: ['Run a destructive database migration']}));
+  assert.equal(access.status, 'needs_input');
+  assert.equal(migration.status, 'needs_input');
+  assert.ok(access.data?.risks.some(risk => risk.level === 'critical'));
+  assert.ok(migration.data?.risks.some(risk => risk.level === 'critical'));
+});
+
+test('detects Preview versus Production inconsistency and preserves critical precedence', () => {
+  const response = prepareRelease('release-inconsistent-target', request({
+    target_environment: 'preview',
+    planned_changes: ['Promote the release to Production after deployment'],
+    declared_risks: ['Possible downtime during the promotion'],
+  }));
+  assert.equal(response.status, 'needs_input');
+  assert.equal(response.data?.proposal_or_findings.readiness, 'not_ready');
+  assert.ok(response.data?.risks.some(risk => risk.level === 'critical'));
+  assert.match(JSON.stringify(response.data?.decisions_pending), /sensitive-risk|release decision/);
+});
+
+test('keeps moderate availability risks from being promoted to critical', () => {
+  const response = prepareRelease('release-moderate-risk', request({declared_risks: ['Possible downtime during a maintenance window']}));
+  assert.equal(response.status, 'ok');
+  assert.equal(response.data?.proposal_or_findings.readiness, 'ready_for_client_review');
+  assert.ok(response.data?.risks.length > 0);
+  assert.ok(response.data?.risks.every(risk => risk.level === 'moderate'));
+});
+
+test('material dependencies and pending decisions prevent optimistic readiness', () => {
+  const dependency = prepareRelease('release-dependency', request({dependencies: ['Required artifact is unavailable']}));
+  const decision = prepareRelease('release-decision', request({decisions_pending: ['Production authorization is pending']}));
+  assert.equal(dependency.status, 'needs_input');
+  assert.equal(decision.status, 'needs_input');
+  assert.equal(dependency.data?.proposal_or_findings.readiness, 'not_ready');
+  assert.equal(decision.data?.proposal_or_findings.readiness, 'not_ready');
+  assert.match(JSON.stringify(dependency.data?.decisions_pending), /dependency|pending/);
+});
+
 test('rejects malformed, unsupported, unknown and unlinked references', () => {
   assert.equal(prepareRelease('release-type', request({scope: 'not-a-list'})).status, 'error');
   assert.equal(prepareRelease('release-version', request({capability_version: '2.0.0'})).status, 'error');
