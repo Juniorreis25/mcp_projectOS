@@ -136,16 +136,18 @@ const conflictDefinitions: readonly {family: ConflictFamily; polarity: ConflictP
   {
     family: 'approval',
     polarity: 'positive',
-    pattern: /\b(?:require|requires|required|must|mandatory|approval\s+required|exigir|exige|exigido|obrigat[oó]rio|necess[aá]rio)\b/i,
-    terms: ['require', 'requires', 'required', 'must', 'mandatory', 'approval', 'exigir', 'exige', 'exigido', 'obrigatório', 'obrigatorio', 'necessário', 'necessario'],
+    pattern: /\b(?:require|requires|required|must|mandatory|approval\s+required|exigir|exige|exigido|obrigat[oó]ri[oa]|necess[aá]ri[oa])\b/i,
+    terms: ['require', 'requires', 'required', 'must', 'mandatory', 'approval', 'exigir', 'exige', 'exigido', 'obrigatório', 'obrigatoria', 'obrigatória', 'obrigatorio', 'necessário', 'necessaria', 'necessária', 'necessario'],
   },
   {
     family: 'approval',
     polarity: 'negative',
-    pattern: /\b(?:waive|waived|optional|exempt|not\s+required|without\s+approval|dispensar|dispensado|opcional|isento|não\s+obrigatório|nao\s+obrigatorio|sem\s+aprovação|sem\s+aprovacao)\b/i,
-    terms: ['waive', 'waived', 'optional', 'exempt', 'not', 'required', 'without', 'approval', 'dispensar', 'dispensado', 'opcional', 'isento', 'não', 'nao', 'obrigatório', 'obrigatorio', 'sem', 'aprovação', 'aprovacao'],
+    pattern: /\b(?:waive|waived|optional|exempt|not\s+required|without\s+approval|dispensar|dispensado|opcional|isento|não\s+obrigat[oó]ri[oa]|nao\s+obrigat[oó]ri[oa]|sem\s+aprova[cç][aã]o)\b/i,
+    terms: ['waive', 'waived', 'optional', 'exempt', 'not', 'required', 'without', 'approval', 'dispensar', 'dispensado', 'opcional', 'isento', 'não', 'nao', 'obrigatório', 'obrigatoria', 'obrigatória', 'obrigatorio', 'sem', 'aprovação', 'aprovacao'],
   },
 ];
+
+const approvalNegationPattern = /\b(?:not\s+required|not\s+mandatory|without\s+approval|(?:approval|aprova[cç][aã]o)\s+(?:is\s+)?(?:not|não|nao)\s+(?:required|mandatory|obrigat[oó]ri[oa]|necess[aá]ri[oa])|(?:não|nao)\s+(?:é\s+)?(?:obrigat[oó]ri[oa]|necess[aá]ri[oa])|sem\s+aprova[cç][aã]o|waive|waived|optional|exempt|dispensar|dispensado|opcional|isento)\b/gi;
 
 const conflictEnvironmentTokens = new Set(['preview', 'production', 'prod', 'staging', 'development', 'homologacao', 'homologação', 'producao', 'produção']);
 const conflictGenericTopicTokens = new Set(['allow', 'allowed', 'permit', 'permitted', 'authorize', 'authorized', 'enable', 'enabled', 'deny', 'denied', 'prohibit', 'prohibited', 'forbid', 'forbidden', 'disallow', 'disable', 'disabled', 'revoke', 'required', 'mandatory', 'optional', 'waived', 'approval', 'without', 'not', 'sem', 'para', 'with', 'the', 'and', 'or', 'com', 'uma', 'que', 'this', 'that', 'decision', 'constraint', 'record', 'policy', 'regra', 'decisao', 'decisão', 'restricao', 'restrição', 'historical', 'history', 'workflow', 'process', 'access', 'acesso']);
@@ -385,13 +387,35 @@ function conflictSignals(record: MemoryRecord): ConflictSignal[] {
   const lowerContent = record.content.toLocaleLowerCase();
   const allTokens = tokens(record.content);
   const environments = new Set([...allTokens].filter(token => conflictEnvironmentTokens.has(token)));
+  const approvalSafeContent = lowerContent.replace(approvalNegationPattern, ' approval-negation ');
   return conflictDefinitions
-    .filter(definition => definition.pattern.test(lowerContent))
+    .filter(definition => definition.family !== 'approval' || definition.polarity === 'negative'
+      ? definition.pattern.test(lowerContent)
+      : definition.pattern.test(approvalSafeContent))
     .map(definition => {
       const excluded = new Set([...definition.terms, ...conflictGenericTopicTokens]);
       const topics = new Set([...allTokens].filter(token => !excluded.has(token) && !conflictEnvironmentTokens.has(token)));
       return {family: definition.family, polarity: definition.polarity, topics, environments};
     });
+}
+
+function comparableConflictSignals(record: MemoryRecord): ConflictSignal[] {
+  const signals = conflictSignals(record);
+  const ambiguousFamilies = new Set<ConflictFamily>();
+  for (const family of ['permission', 'approval'] as const) {
+    const polarities = new Set(signals.filter(signal => signal.family === family).map(signal => signal.polarity));
+    if (polarities.size > 1) ambiguousFamilies.add(family);
+  }
+  return signals.filter(signal => !ambiguousFamilies.has(signal.family));
+}
+
+function hasAmbiguousConflictPolarity(record: MemoryRecord): boolean {
+  const signals = conflictSignals(record);
+  for (const family of ['permission', 'approval'] as const) {
+    const polarities = new Set(signals.filter(signal => signal.family === family).map(signal => signal.polarity));
+    if (polarities.size > 1) return true;
+  }
+  return false;
 }
 
 function signalsConflict(left: ConflictSignal, right: ConflictSignal): boolean {
@@ -426,8 +450,8 @@ function historicalConflicts(relevant: readonly MemoryRecord[]): MemoryConclusio
       const rightId = left.id.localeCompare(right.id) < 0 ? right.id : left.id;
       const id = `conflict-${leftId}-${rightId}`;
       if (seen.has(id)) continue;
-      const leftSignals = conflictSignals(left);
-      const rightSignals = conflictSignals(right);
+      const leftSignals = comparableConflictSignals(left);
+      const rightSignals = comparableConflictSignals(right);
       if (leftSignals.some(leftSignal => rightSignals.some(rightSignal => signalsConflict(leftSignal, rightSignal)))) {
         seen.add(id);
         conclusions.push(conclusion('conflict', id, `Possible conflict between historical records ${leftId} and ${rightId} requires client reconciliation`, [left, right]));
@@ -484,6 +508,7 @@ function analyzeMemory(request: MemoryRequest): MemoryAnalysisInternal {
     if (record.evidence_refs.length === 0) gaps.push(conclusion('gap', `gap-evidence-${record.id}`, `Record ${record.id} has no linked evidence reference; its content cannot be traced beyond the client declaration`, [record]));
     if (!record.date_or_version) gaps.push(conclusion('gap', `gap-currency-${record.id}`, `Record ${record.id} has no declared date or version; currency cannot be established`, [record]));
     if (record.state === 'superseded' || stalePattern.test(record.content)) gaps.push(conclusion('gap', `gap-stale-${record.id}`, `Record ${record.id} may be stale and requires client confirmation`, [record]));
+    if (activeForConflict(record) && hasAmbiguousConflictPolarity(record)) gaps.push(conclusion('gap', `gap-ambiguous-polarity-${record.id}`, `Record ${record.id} contains mixed approval or permission polarity; client reconciliation is required`, [record]));
   });
   if (relevant.some(record => containsSecret(record.content))) {
     gaps.push(conclusion('gap', 'gap-sensitive-text', 'Sensitive-looking content was redacted; the client must provide safe evidence references without secrets', relevant));

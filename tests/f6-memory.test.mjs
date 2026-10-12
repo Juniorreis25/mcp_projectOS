@@ -113,6 +113,51 @@ test('detects require versus waive approval for the same operation', () => {
   assert.ok(response.data?.proposal_or_findings.conflicts.some(item => item.record_ids.includes('require-approval') && item.record_ids.includes('waive-approval')));
 });
 
+test('does not conflict when identical rules say approval is not required', () => {
+  const response = prepareMemory('memory-identical-negative-approval', conflictRequest([
+    historicalRecord('no-approval-a', 'Approval is not required for deploy preview'),
+    historicalRecord('no-approval-b', 'Approval is not required for deploy preview', {evidence_refs: ['history-doc']}),
+  ]));
+  assert.equal(response.status, 'ok');
+  assert.equal(response.data?.proposal_or_findings.conflicts.length, 0);
+});
+
+test('detects required versus not required without double-counting the negative rule', () => {
+  const response = prepareMemory('memory-required-negative', conflictRequest([
+    historicalRecord('approval-required', 'Approval is required for deploy preview'),
+    historicalRecord('approval-not-required', 'Approval is not required for deploy preview', {evidence_refs: ['history-doc']}),
+  ]));
+  assert.equal(response.status, 'needs_input');
+  assert.equal(response.data?.proposal_or_findings.conflicts.filter(item => item.record_ids.includes('approval-required') && item.record_ids.includes('approval-not-required')).length, 1);
+});
+
+test('handles concordant Portuguese non-approval rules without false conflicts', () => {
+  const response = prepareMemory('memory-portuguese-negative-approval', conflictRequest([
+    historicalRecord('sem-aprovacao-a', 'Sem aprovação para deploy em preview'),
+    historicalRecord('sem-aprovacao-b', 'Sem aprovação para deploy em preview', {evidence_refs: ['history-doc']}),
+  ]));
+  assert.equal(response.status, 'ok');
+  assert.equal(response.data?.proposal_or_findings.conflicts.length, 0);
+});
+
+test('detects Portuguese mandatory versus non-mandatory approval', () => {
+  const response = prepareMemory('memory-portuguese-required-negative', conflictRequest([
+    historicalRecord('aprovacao-obrigatoria', 'Aprovação obrigatória para deploy em preview'),
+    historicalRecord('aprovacao-nao-obrigatoria', 'Aprovação não obrigatória para deploy em preview', {evidence_refs: ['history-doc']}),
+  ]));
+  assert.equal(response.status, 'needs_input');
+  assert.ok(response.data?.proposal_or_findings.conflicts.some(item => item.record_ids.includes('aprovacao-obrigatoria') && item.record_ids.includes('aprovacao-nao-obrigatoria')));
+});
+
+test('requests review instead of inventing a conflict for mixed polarity in one record', () => {
+  const response = prepareMemory('memory-ambiguous-polarity', conflictRequest([
+    historicalRecord('ambiguous-approval', 'Approval may be required or waived for deploy preview'),
+  ]));
+  assert.equal(response.status, 'needs_input');
+  assert.equal(response.data?.proposal_or_findings.conflicts.length, 0);
+  assert.ok(response.data?.proposal_or_findings.gaps.some(gap => /mixed approval or permission polarity/i.test(gap.text)));
+});
+
 test('detects controlled Portuguese polarity for the same scoped operation', () => {
   const response = prepareMemory('memory-portuguese-polarity', conflictRequest([
     historicalRecord('permitir-deploy', 'Permitir deploy em preview com aprovação'),
