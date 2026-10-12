@@ -1,5 +1,5 @@
 # ProjectOS — Plano-Mestre de Implementação
-Versão: 3.5 | Atualizado em: 2026-10-11 | Status: F0, F1, F2, F3 e F4 concluídas; F5 e F6 são as próximas fases; F7 está em BACKLOG FUTURO; F8 permanece não iniciada
+Versão: 3.6 | Atualizado em: 2026-10-12 | Status: F0, F1, F2, F3 e F4 concluídas; F5.1 e F5.2 concluídas na `main`; F5.3 implementada na branch `feat/f5-review-analysis` e aguardando revisão; F6 é a próxima fase planejada; F7 está em BACKLOG FUTURO; F8 permanece não iniciada
 
 ## Objetivo
 Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para projetos novos, existentes e retomadas.
@@ -83,10 +83,12 @@ Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para pro
 - **Distinção de evidência:** a homologação remota e seus oito estados são evidência reportada pelo Orquestrador; as validações locais, o CI pré-merge e o CI pós-merge permanecem separados. As chamadas MCP autenticadas não foram reexecutadas após o merge nesta sessão.
 
 ### F5 — Execução e garantia
-- **Status:** F5.1 concluída na `main`; F5.2 em implementação na branch `feat/f5-build-planning`; F5.3–F5.6 não iniciadas.
+- **Status:** F5.1 e F5.2 concluídas na `main`; F5.3 implementada na branch `feat/f5-review-analysis` e aguardando revisão; F5.4–F5.6 não iniciadas.
 - **Atividades:** spec, build, review, test, debug, protect.
-- **Aceite:** Revisão, testes e bloqueio das operações sensíveis; F5.1 aprovada por CI e integração, F5.2 aguardando revisão.
-- **F5.1:** Contratos versionados e função pura de especificação implementados na branch `feat/f5-core-contracts`; sem exposição MCP, execução externa, persistência ou alteração da F4. Versões não suportadas, entradas semanticamente incompletas e qualquer operação solicitada são rejeitadas de forma determinística; autorização de execução permanece no cliente autorizado sob política própria. Aguardando revisão e integração.
+- **Aceite:** Revisão, testes e bloqueio das operações sensíveis; F5.1 e F5.2 integradas e validadas pelo CI; F5.3 aguarda revisão técnica, CI e decisão de integração.
+- **F5.1:** Contratos versionados e função pura de especificação implementados na branch `feat/f5-core-contracts`, corrigidos e integrados pelo PR #8; sem exposição MCP, execução externa, persistência ou alteração da F4. Versões não suportadas, entradas semanticamente incompletas e qualquer operação solicitada são rejeitadas de forma determinística; autorização de execução permanece no cliente autorizado sob política própria.
+- **F5.2:** Planejamento read-only de build implementado em `packages/core/build-planning.ts`, sem execução, escrita, deploy, migração, persistência ou nova tool MCP. O PR #9 foi integrado por squash na `main` no commit `af24cacdebe22e28857df4b62368ec57f8834eea`; os checks pós-merge `check` e `mcp-build` foram aprovados e a `release/production` permaneceu inalterada.
+- **F5.3:** Análise estruturada read-only implementada na branch `feat/f5-review-analysis` como função pura em `packages/core/review-analysis.ts`. A análise usa regras determinísticas sobre especificação, diffs, artefatos e evidências fornecidos pelo cliente; estrutura achados P0–P3, permite múltiplos achados estáveis por artefato, valida estruturalmente hunks unificados com cabeçalhos e contagens de linhas antigas/novas, distingue linhas adicionadas/removidas/contexto somente em diffs válidos, registra limitações para material sem semântica Git comprovada, trata texto de prompt injection como dado não confiável e não promete revisão semântica completa. Diff ausente, vazio ou somente whitespace sem outro artefato válido retorna `needs_input`; tipos, campos desconhecidos e versões incompatíveis retornam `error`. Não há acesso a filesystem, repositório, PR, serviços externos, execução, autorização ou exposição MCP. Correção F5.3.2 validada com 62 testes raiz, typecheck/build/smoke MCP e `git diff --check` aprovados. Aguardando revisão e integração.
 
 ### F6 — Catálogo completo
 - **Status:** Próxima fase planejada; não iniciada.
@@ -109,6 +111,9 @@ Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para pro
 Após cada fase ou marco relevante, registrar data, evidências verificáveis (commit, PR, workflow), testes, bloqueios e próxima ação. Não marcar fase concluída sem aceite verificável.
 
 ## Histórico
+- 2026-10-12 — F5.3.2: validação estrutural de diffs unificados adicionada à F5.3; contagens de hunks, múltiplos arquivos/hunks, indicadores adicionados/removidos/contextuais e fallback sem proveniência cobertos; 62 testes raiz, validações MCP locais e `git diff --check` aprovados; aguardando CI e revisão.
+- 2026-10-12 — F5.3.1: correções da revisão da PR #10 implementadas na branch `feat/f5-review-analysis`; múltiplos achados por artefato, proveniência de diffs unificados, deduplicação determinística e `needs_input` para diff ausente/vazio adicionados; 60 testes raiz, validações MCP locais e `git diff --check` aprovados; aguardando CI e revisão.
+- 2026-10-12 — F5.3: análise estruturada read-only implementada na branch `feat/f5-review-analysis`, com contratos versionados, validação determinística, achados P0–P3, lacunas, limites explícitos, bloqueio de operações solicitadas e testes de regressão; aguardando revisão técnica e CI.
 - 2026-10-11 — F5.1: contratos compartilhados das capacidades e preparação read-only de `spec` implementados em branch dedicada; validação e CI aguardam execução.
 - 2026-10-11 — F5.1.2: correções de versões suportadas, ausência semântica, bloqueio determinístico de operações e autoridade do Envelope Core integradas na `main` pelo PR #8; F5.2 iniciada apenas como planejamento read-only de build.
 - 2026-10-11 — v3.5: F4 integrada à `main` pelo PR #5, squash commit `32f7947`; CI F1/F2 pós-merge aprovado; Preview pós-merge READY; `release/production` preservada como Production Branch; F7 classificada como BACKLOG FUTURO e sem dependência obrigatória para F8 ou release 1.0.
