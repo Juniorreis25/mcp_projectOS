@@ -83,9 +83,9 @@ Criar servidor MCP remoto na Vercel com skills versionadas e portáveis para pro
 - **Distinção de evidência:** a homologação remota e seus oito estados são evidência reportada pelo Orquestrador; as validações locais, o CI pré-merge e o CI pós-merge permanecem separados. As chamadas MCP autenticadas não foram reexecutadas após o merge nesta sessão.
 
 ### F5 — Execução e garantia
-- **Status:** Próxima fase de implementação; não iniciada.
+- **Status:** F5.1 concluída na `main`; F5.2 em implementação na branch `feat/f5-build-planning`; F5.3–F5.6 não iniciadas.
 - **Atividades:** spec, build, review, test, debug, protect.
-- **Aceite:** Revisão, testes e bloqueio das operações sensíveis.
+- **Aceite:** Revisão, testes e bloqueio das operações sensíveis; F5.1 aprovada por CI e integração, F5.2 aguardando revisão.
 - **F5.1:** Contratos versionados e função pura de especificação implementados na branch `feat/f5-core-contracts`; sem exposição MCP, execução externa, persistência ou alteração da F4. Versões não suportadas, entradas semanticamente incompletas e qualquer operação solicitada são rejeitadas de forma determinística; autorização de execução permanece no cliente autorizado sob política própria. Aguardando revisão e integração.
 
 ### F6 — Catálogo completo
@@ -110,6 +110,7 @@ Após cada fase ou marco relevante, registrar data, evidências verificáveis (c
 
 ## Histórico
 - 2026-10-11 — F5.1: contratos compartilhados das capacidades e preparação read-only de `spec` implementados em branch dedicada; validação e CI aguardam execução.
+- 2026-10-11 — F5.1.2: correções de versões suportadas, ausência semântica, bloqueio determinístico de operações e autoridade do Envelope Core integradas na `main` pelo PR #8; F5.2 iniciada apenas como planejamento read-only de build.
 - 2026-10-11 — v3.5: F4 integrada à `main` pelo PR #5, squash commit `32f7947`; CI F1/F2 pós-merge aprovado; Preview pós-merge READY; `release/production` preservada como Production Branch; F7 classificada como BACKLOG FUTURO e sem dependência obrigatória para F8 ou release 1.0.
 - 2026-10-11 — v3.4: homologação MCP nativa da F4 reportada no deployment Preview `dpl_CoXcTyZxoHN2PVYEmVZ4ZcB1pNZJ`, commit `c136b13`; oito cenários, catálogo e correção da ambiguidade registrados como aprovados; request IDs não retidos no material local; F4 aguarda integração autorizada e não foi marcada concluída.
 - 2026-10-11 — v3.3: investigação da divergência `needs_input`; payload remoto exato indisponível, fixtures novas reproduziram a seleção indevida de `new`; correção mínima para objetivos genéricos/ambíguos, dois testes de regressão e checks locais aprovados; F4 permanece bloqueada aguardando CI do novo HEAD e homologação remota.

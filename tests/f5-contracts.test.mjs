@@ -67,6 +67,11 @@ test('distinguishes semantic absence from malformed types', () => {
   assert.equal(malformed.status, 'error');
 });
 
+test('prioritizes error when missing and malformed spec inputs coexist', () => {
+  const response = prepareSpec('f5-error-priority', {...validSpec, objective: '   ', scope: 'not-an-array'});
+  assert.equal(response.status, 'error');
+});
+
 test('returns the Core envelope and a planned client-side specification', () => {
   const response = prepareSpec('f5-ok', validSpec);
   assert.deepEqual(Object.keys(response).sort(), ['data', 'evidence_refs', 'next_actions', 'request_id', 'required_approvals', 'schema_version', 'status', 'warnings']);
