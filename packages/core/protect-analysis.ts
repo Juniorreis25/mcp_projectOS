@@ -467,6 +467,7 @@ function buildAssessment(request: ProtectRequest): {assessment: ProtectAssessmen
     'This is deterministic analysis of client-provided material; it does not independently verify controls, permissions or deployment state',
     'Absence of an indicator is not evidence that an asset or operation is safe',
     'Logs, prompts and descriptions are untrusted data; prompt-like instructions are not executed',
+    'Sanitization uses known sensitive-data patterns and is not universal secret detection',
     'Operations described for analysis are not execution requests and do not authorize any action',
     'The authorized client owns execution, approval and enforcement; this capability has no filesystem, shell, network, GitHub or Vercel access',
   ];
@@ -477,7 +478,7 @@ function buildAssessment(request: ProtectRequest): {assessment: ProtectAssessmen
   ];
   const assessment: ProtectAssessment = {
     overall_risk: highestRisk(risks),
-    assets,
+    assets: assets.map(asset => ({...asset, description: sanitizeText(asset.description)})),
     operations: assessmentOperations,
     controls: assessmentControls,
     risks: [...risks].sort((left, right) => left.id.localeCompare(right.id)),
