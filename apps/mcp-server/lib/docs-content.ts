@@ -36,7 +36,8 @@ export const internalCapabilities = [
 ];
 
 export const futureRoadmap = [
-  { id: 'F6.6', title: 'Portal Web de Documentação e Onboarding', status: 'EM IMPLEMENTAÇÃO' },
+  { id: 'F6.6', title: 'Portal Web de Documentação e Onboarding', status: 'CONCLUÍDA' },
+  { id: 'F6.7', title: 'Redesign visual e preparação da publicação', status: 'EM IMPLEMENTAÇÃO' },
   { id: 'F7', title: 'Persistência compartilhada', status: 'BACKLOG FUTURO' },
   { id: 'F8', title: 'Homologação e release 1.0', status: 'NÃO INICIADA' },
 ];
