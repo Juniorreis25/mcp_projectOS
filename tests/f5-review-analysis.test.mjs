@@ -98,14 +98,20 @@ test('emits multiple stable findings from one artifact and deduplicates repeated
   assert.match(sensitive?.observation ?? '', /2 occurrences/);
 });
 
-const unifiedDiff = (body) => [
-  'diff --git a/src/example.ts b/src/example.ts',
-  'index 1111111..2222222 100644',
-  '--- a/src/example.ts',
-  '+++ b/src/example.ts',
-  '@@ -1,4 +1,4 @@',
-  ...body,
-].join('\n');
+const fileSection = (path, body, oldStart = 1, newStart = 1) => {
+  const oldCount = body.filter(line => line.startsWith('-') || line.startsWith(' ')).length;
+  const newCount = body.filter(line => line.startsWith('+') || line.startsWith(' ')).length;
+  return [
+    `diff --git a/${path} b/${path}`,
+    'index 1111111..2222222 100644',
+    `--- a/${path}`,
+    `+++ b/${path}`,
+    `@@ -${oldStart},${oldCount} +${newStart},${newCount} @@`,
+    ...body,
+  ].join('\n');
+};
+
+const unifiedDiff = (body) => fileSection('src/example.ts', body);
 
 test('distinguishes added, removed and both-sided indicators in valid unified diffs', () => {
   const added = prepareReview('review-added', {...validReview, diff: unifiedDiff(['+api_key = newly-added'])});
@@ -138,6 +144,67 @@ test('finds multiple risks in one valid unified diff without treating context as
   assert.deepEqual(findings.map(finding => finding.priority), ['P0', 'P1', 'P2', 'P3']);
   assert.ok(findings.every(finding => /added lines|context lines/.test(finding.observation)));
   assert.equal(new Set(findings.map(finding => finding.id)).size, findings.length);
+});
+
+test('handles context-only indicators and multiple hunks across multiple files', () => {
+  const context = prepareReview('review-context', {...validReview, diff: unifiedDiff([' api_key = existing-context'])});
+  assert.equal(context.status, 'ok');
+  assert.match(context.data?.proposal_or_findings.findings[0]?.observation ?? '', /context lines/);
+  assert.equal(context.data?.proposal_or_findings.findings[0]?.kind, 'potential_risk');
+
+  const multiFile = [
+    fileSection('src/one.ts', ['-api_key = old', '+api_key = new']),
+    [
+      'diff --git a/src/two.ts b/src/two.ts',
+      'index 3333333..4444444 100644',
+      '--- a/src/two.ts',
+      '+++ b/src/two.ts',
+      '@@ -1,1 +1,1 @@',
+      '-safe = false',
+      '+safe = true',
+      '@@ -10,1 +10,2 @@',
+      ' context = true',
+      '+TODO: document this hunk',
+    ].join('\n'),
+  ].join('\n');
+  const response = prepareReview('review-multi-file', {...validReview, diff: multiFile, artifacts: undefined});
+  assert.equal(response.status, 'ok');
+  assert.ok(response.data?.proposal_or_findings.analyzed_artifact_refs.includes('inline-diff'));
+  assert.ok(response.data?.proposal_or_findings.findings.some(finding => finding.title === 'Sensitive-looking value assignment'));
+  assert.ok(response.data?.proposal_or_findings.findings.some(finding => finding.title === 'Unresolved implementation marker'));
+  assert.equal(response.data?.proposal_or_findings.limitations.some(item => /provenance cannot be determined/.test(item)), false);
+});
+
+test('rejects inconsistent, incomplete and headerless hunks as structurally untrusted', () => {
+  const inconsistent = prepareReview('review-inconsistent-hunk', {
+    ...validReview,
+    diff: [
+      '--- a/file',
+      '+++ b/file',
+      '@@ -1,2 +1,2 @@',
+      '+api_key = new',
+    ].join('\n'),
+    artifacts: undefined,
+  });
+  const incomplete = prepareReview('review-incomplete-hunk', {
+    ...validReview,
+    diff: [
+      '--- a/file',
+      '+++ b/file',
+      '@@ -1,2 +1,2 @@',
+      ' context only one side',
+    ].join('\n'),
+    artifacts: undefined,
+  });
+  const headerless = prepareReview('review-headerless-hunk', {
+    ...validReview,
+    diff: ['@@ -1,1 +1,1 @@', '+api_key = new'].join('\n'),
+    artifacts: undefined,
+  });
+  for (const response of [inconsistent, incomplete, headerless]) {
+    assert.equal(response.status, 'ok');
+    assert.ok(response.data?.proposal_or_findings.limitations.some(item => /provenance cannot be determined/.test(item)));
+  }
 });
 
 test('does not treat arbitrary text or malformed diff material as a valid Git diff', () => {

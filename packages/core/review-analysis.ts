@@ -302,7 +302,7 @@ function blockedResponse(requestId: string, input: unknown, operations: string[]
   });
 }
 
-type DiffLineKind = 'added' | 'removed' | 'context' | 'metadata';
+type DiffLineKind = 'added' | 'removed' | 'context' | 'metadata' | 'unclassified';
 
 interface DiffLine {
   kind: DiffLineKind;
@@ -315,45 +315,125 @@ interface ParsedDiff {
   limitation?: string;
 }
 
+interface ActiveHunk {
+  oldExpected: number;
+  newExpected: number;
+  oldSeen: number;
+  newSeen: number;
+}
+
+function isMetadataLine(line: string): boolean {
+  return line.startsWith('diff --git ') || line.startsWith('index ') || line.startsWith('--- ') || line.startsWith('+++ ') || line.startsWith('@@ ') || line.startsWith('new file mode ') || line.startsWith('deleted file mode ') || line.startsWith('similarity index ') || line.startsWith('rename from ') || line.startsWith('rename to ');
+}
+
+function unclassifiedDiffLines(content: string): DiffLine[] {
+  return content.split(/\r?\n/).map(line => {
+    if (isMetadataLine(line) || line.startsWith('\\ No newline')) return {kind: 'metadata', text: line};
+    if (line.startsWith('+') || line.startsWith('-') || line.startsWith(' ')) return {kind: 'unclassified', text: line.slice(1)};
+    return {kind: 'unclassified', text: line};
+  });
+}
+
+function invalidDiff(content: string, ref: string, reason: string): ParsedDiff {
+  return {
+    valid: false,
+    lines: unclassifiedDiffLines(content),
+    limitation: `Material ${ref} ${reason}; introduced and removed provenance cannot be determined.`,
+  };
+}
+
+function parseHunkHeader(line: string): {oldExpected: number; newExpected: number} | null {
+  const match = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(?:.*)$/.exec(line);
+  if (!match) return null;
+  return {oldExpected: Number(match[2] ?? '1'), newExpected: Number(match[4] ?? '1')};
+}
+
 function parseUnifiedDiff(content: string, ref: string): ParsedDiff {
   const sourceLines = content.split(/\r?\n/);
-  const hasOldHeader = sourceLines.some(line => line.startsWith('--- '));
-  const hasNewHeader = sourceLines.some(line => line.startsWith('+++ '));
-  const hasHunk = sourceLines.some(line => line.startsWith('@@ '));
-  if (!hasOldHeader || !hasNewHeader || !hasHunk) {
-    return {
-      valid: false,
-      lines: [{kind: 'metadata', text: content}],
-      limitation: `Material ${ref} was not recognized as a valid unified Git diff; introduced and removed provenance cannot be determined.`,
-    };
-  }
-
-  let inHunk = false;
+  let fileHasOldHeader = false;
+  let fileHasNewHeader = false;
+  let fileHasHunk = false;
+  let hunkCount = 0;
+  let activeHunk: ActiveHunk | null = null;
   const lines: DiffLine[] = [];
+
+  const closeHunk = (): boolean => {
+    if (!activeHunk) return true;
+    const complete = activeHunk.oldSeen === activeHunk.oldExpected && activeHunk.newSeen === activeHunk.newExpected;
+    activeHunk = null;
+    return complete;
+  };
+
+  const closeFile = (): boolean => {
+    if (!closeHunk()) return false;
+    if (!fileHasOldHeader || !fileHasNewHeader || !fileHasHunk) return false;
+    fileHasOldHeader = false;
+    fileHasNewHeader = false;
+    fileHasHunk = false;
+    return true;
+  };
+
   for (const line of sourceLines) {
-    if (line.startsWith('@@ ')) {
-      inHunk = true;
+    const hunkComplete = activeHunk !== null && activeHunk.oldSeen === activeHunk.oldExpected && activeHunk.newSeen === activeHunk.newExpected;
+    const hunkBoundary = line.startsWith('diff --git ') || line.startsWith('index ') || line.startsWith('@@ ') || (hunkComplete && (isMetadataLine(line) || line.startsWith('new file mode ') || line.startsWith('deleted file mode ') || line.startsWith('similarity index ') || line.startsWith('rename from ') || line.startsWith('rename to ') || line.trim() === ''));
+    if (activeHunk && hunkBoundary) {
+      if (!closeHunk()) return invalidDiff(content, ref, 'contains a hunk with inconsistent line counts');
+    }
+
+    if (activeHunk && (line.startsWith('+') || line.startsWith('-') || line.startsWith(' ') || line.startsWith('\\ No newline'))) {
+      if (line.startsWith('\\ No newline')) {
+        lines.push({kind: 'metadata', text: line});
+      } else if (line.startsWith('+')) {
+        if (activeHunk.newSeen >= activeHunk.newExpected) return invalidDiff(content, ref, 'contains more new lines than declared by a hunk');
+        activeHunk.newSeen += 1;
+        lines.push({kind: 'added', text: line.slice(1)});
+      } else if (line.startsWith('-')) {
+        if (activeHunk.oldSeen >= activeHunk.oldExpected) return invalidDiff(content, ref, 'contains more old lines than declared by a hunk');
+        activeHunk.oldSeen += 1;
+        lines.push({kind: 'removed', text: line.slice(1)});
+      } else {
+        if (activeHunk.oldSeen >= activeHunk.oldExpected || activeHunk.newSeen >= activeHunk.newExpected) return invalidDiff(content, ref, 'contains more context lines than declared by a hunk');
+        activeHunk.oldSeen += 1;
+        activeHunk.newSeen += 1;
+        lines.push({kind: 'context', text: line.slice(1)});
+      }
+      continue;
+    }
+
+    if (activeHunk) return invalidDiff(content, ref, 'contains an invalid line sequence inside a hunk');
+
+    if (line.startsWith('diff --git ')) {
+      if (fileHasOldHeader || fileHasNewHeader || fileHasHunk) {
+        if (!closeFile()) return invalidDiff(content, ref, 'contains an incomplete file section');
+      }
       lines.push({kind: 'metadata', text: line});
-    } else if (line.startsWith('diff --git ') || line.startsWith('index ') || line.startsWith('--- ') || line.startsWith('+++ ') || line.startsWith('new file mode ') || line.startsWith('deleted file mode ')) {
+    } else if (line.startsWith('--- ')) {
+      if (fileHasOldHeader || fileHasNewHeader || fileHasHunk) {
+        if (!closeFile()) return invalidDiff(content, ref, 'contains an incomplete file section');
+      }
+      fileHasOldHeader = true;
       lines.push({kind: 'metadata', text: line});
-    } else if (inHunk && line.startsWith('+')) {
-      lines.push({kind: 'added', text: line.slice(1)});
-    } else if (inHunk && line.startsWith('-')) {
-      lines.push({kind: 'removed', text: line.slice(1)});
-    } else if (inHunk && line.startsWith(' ')) {
-      lines.push({kind: 'context', text: line.slice(1)});
-    } else if (inHunk && line.startsWith('\\')) {
+    } else if (line.startsWith('+++ ')) {
+      if (!fileHasOldHeader || fileHasNewHeader) return invalidDiff(content, ref, 'contains an invalid old/new file header sequence');
+      fileHasNewHeader = true;
       lines.push({kind: 'metadata', text: line});
-    } else if (inHunk && line.length > 0) {
-      return {
-        valid: false,
-        lines: [{kind: 'metadata', text: content}],
-        limitation: `Material ${ref} contains malformed hunk lines; introduced and removed provenance cannot be determined.`,
-      };
+    } else if (line.startsWith('@@ ')) {
+      if (!fileHasOldHeader || !fileHasNewHeader || fileHasHunk) {
+        if (!fileHasOldHeader || !fileHasNewHeader) return invalidDiff(content, ref, 'contains a hunk without paired file headers');
+      }
+      const header = parseHunkHeader(line);
+      if (!header) return invalidDiff(content, ref, 'contains an invalid hunk header');
+      activeHunk = {...header, oldSeen: 0, newSeen: 0};
+      fileHasHunk = true;
+      hunkCount += 1;
+      lines.push({kind: 'metadata', text: line});
+    } else if (line.startsWith('index ') || line.startsWith('new file mode ') || line.startsWith('deleted file mode ') || line.startsWith('similarity index ') || line.startsWith('rename from ') || line.startsWith('rename to ') || line.startsWith('\\ No newline') || line.trim() === '') {
+      lines.push({kind: 'metadata', text: line});
     } else {
-      lines.push({kind: 'metadata', text: line});
+      return invalidDiff(content, ref, 'contains text outside a valid diff section');
     }
   }
+  if (!closeFile() || hunkCount === 0) return invalidDiff(content, ref, 'does not contain a complete unified diff');
   return {valid: true, lines};
 }
 
