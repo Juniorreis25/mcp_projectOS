@@ -107,8 +107,48 @@ const secretPatterns: readonly RegExp[] = [
   /\beyJ[A-Za-z0-9_-]{12,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g,
   /ignore\s+all\s+previous\s+instructions[^.\n]*/gi,
 ];
-const conflictPattern = /\b(?:contradict(?:s|ory|ion)?|conflict(?:s|ing)?|inconsistent|incompat(?:ible|ibility)|supersed(?:e|ed|ing))\b|contradi[cç][aã]o|incompat[ií]vel|conflitante|substitu[ií]d[ao]/i;
+const explicitConflictPattern = /\b(?:contradict(?:s|ory|ion)?|conflict(?:s|ing)?|inconsistent|incompat(?:ible|ibility))\b|contradi[cç][aã]o|incompat[ií]vel|conflitante/i;
 const stalePattern = /\b(?:stale|outdated|obsolete|old|desatualizad[oa]|antig[oa]|obsolet[oa])\b/i;
+
+type ConflictPolarity = 'positive' | 'negative';
+type ConflictFamily = 'permission' | 'approval';
+
+interface ConflictSignal {
+  family: ConflictFamily;
+  polarity: ConflictPolarity;
+  topics: Set<string>;
+  environments: Set<string>;
+}
+
+const conflictDefinitions: readonly {family: ConflictFamily; polarity: ConflictPolarity; pattern: RegExp; terms: readonly string[]}[] = [
+  {
+    family: 'permission',
+    polarity: 'positive',
+    pattern: /\b(?:allow|allows|allowed|permit|permits|permitted|authorize|authorizes|authorized|enable|enables|enabled|permitir|permite|permitido|autorizar|autoriza|autorizado|habilitar|habilita|habilitado)\b/i,
+    terms: ['allow', 'allows', 'allowed', 'permit', 'permits', 'permitted', 'authorize', 'authorizes', 'authorized', 'enable', 'enables', 'enabled', 'permitir', 'permite', 'permitido', 'autorizar', 'autoriza', 'autorizado', 'habilitar', 'habilita', 'habilitado'],
+  },
+  {
+    family: 'permission',
+    polarity: 'negative',
+    pattern: /\b(?:deny|denies|denied|prohibit|prohibits|prohibited|forbid|forbids|forbidden|disallow|disallows|disable|disabled|revoke|revokes|revoked|negar|nega|negado|proibir|proíbe|proibido|desabilitar|desabilita|desabilitado|desativar|revogar|revogado)\b/i,
+    terms: ['deny', 'denies', 'denied', 'prohibit', 'prohibits', 'prohibited', 'forbid', 'forbids', 'forbidden', 'disallow', 'disallows', 'disable', 'disabled', 'revoke', 'revokes', 'revoked', 'negar', 'nega', 'negado', 'proibir', 'proíbe', 'proibido', 'desabilitar', 'desabilita', 'desabilitado', 'desativar', 'revogar', 'revogado'],
+  },
+  {
+    family: 'approval',
+    polarity: 'positive',
+    pattern: /\b(?:require|requires|required|must|mandatory|approval\s+required|exigir|exige|exigido|obrigat[oó]rio|necess[aá]rio)\b/i,
+    terms: ['require', 'requires', 'required', 'must', 'mandatory', 'approval', 'exigir', 'exige', 'exigido', 'obrigatório', 'obrigatorio', 'necessário', 'necessario'],
+  },
+  {
+    family: 'approval',
+    polarity: 'negative',
+    pattern: /\b(?:waive|waived|optional|exempt|not\s+required|without\s+approval|dispensar|dispensado|opcional|isento|não\s+obrigatório|nao\s+obrigatorio|sem\s+aprovação|sem\s+aprovacao)\b/i,
+    terms: ['waive', 'waived', 'optional', 'exempt', 'not', 'required', 'without', 'approval', 'dispensar', 'dispensado', 'opcional', 'isento', 'não', 'nao', 'obrigatório', 'obrigatorio', 'sem', 'aprovação', 'aprovacao'],
+  },
+];
+
+const conflictEnvironmentTokens = new Set(['preview', 'production', 'prod', 'staging', 'development', 'homologacao', 'homologação', 'producao', 'produção']);
+const conflictGenericTopicTokens = new Set(['allow', 'allowed', 'permit', 'permitted', 'authorize', 'authorized', 'enable', 'enabled', 'deny', 'denied', 'prohibit', 'prohibited', 'forbid', 'forbidden', 'disallow', 'disable', 'disabled', 'revoke', 'required', 'mandatory', 'optional', 'waived', 'approval', 'without', 'not', 'sem', 'para', 'with', 'the', 'and', 'or', 'com', 'uma', 'que', 'this', 'that', 'decision', 'constraint', 'record', 'policy', 'regra', 'decisao', 'decisão', 'restricao', 'restrição', 'historical', 'history', 'workflow', 'process', 'access', 'acesso']);
 
 function containsSecret(value: string): boolean {
   return secretPatterns.some(pattern => {
@@ -341,6 +381,63 @@ function recordTokens(record: MemoryRecord): Set<string> {
   return tokens(`${record.content} ${record.source} ${record.type}`);
 }
 
+function conflictSignals(record: MemoryRecord): ConflictSignal[] {
+  const lowerContent = record.content.toLocaleLowerCase();
+  const allTokens = tokens(record.content);
+  const environments = new Set([...allTokens].filter(token => conflictEnvironmentTokens.has(token)));
+  return conflictDefinitions
+    .filter(definition => definition.pattern.test(lowerContent))
+    .map(definition => {
+      const excluded = new Set([...definition.terms, ...conflictGenericTopicTokens]);
+      const topics = new Set([...allTokens].filter(token => !excluded.has(token) && !conflictEnvironmentTokens.has(token)));
+      return {family: definition.family, polarity: definition.polarity, topics, environments};
+    });
+}
+
+function signalsConflict(left: ConflictSignal, right: ConflictSignal): boolean {
+  return left.family === right.family
+    && left.polarity !== right.polarity
+    && (left.environments.size === 0 || right.environments.size === 0 || [...left.environments].some(environment => right.environments.has(environment)))
+    && [...left.topics].some(topic => right.topics.has(topic));
+}
+
+function activeForConflict(record: MemoryRecord): boolean {
+  return record.state !== 'resolved' && record.state !== 'superseded';
+}
+
+function historicalConflicts(relevant: readonly MemoryRecord[]): MemoryConclusion[] {
+  const conclusions: MemoryConclusion[] = [];
+  const seen = new Set<string>();
+
+  for (const record of relevant) {
+    if (explicitConflictPattern.test(record.content)) {
+      const id = `conflict-${record.id}`;
+      seen.add(id);
+      conclusions.push(conclusion('conflict', id, `Possible historical conflict involving record ${record.id} requires client reconciliation: ${record.content}`, [record]));
+    }
+  }
+
+  const candidates = relevant.filter(record => activeForConflict(record) && (record.type === 'decision' || record.type === 'constraint'));
+  for (let leftIndex = 0; leftIndex < candidates.length; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < candidates.length; rightIndex += 1) {
+      const left = candidates[leftIndex];
+      const right = candidates[rightIndex];
+      const leftId = left.id.localeCompare(right.id) < 0 ? left.id : right.id;
+      const rightId = left.id.localeCompare(right.id) < 0 ? right.id : left.id;
+      const id = `conflict-${leftId}-${rightId}`;
+      if (seen.has(id)) continue;
+      const leftSignals = conflictSignals(left);
+      const rightSignals = conflictSignals(right);
+      if (leftSignals.some(leftSignal => rightSignals.some(rightSignal => signalsConflict(leftSignal, rightSignal)))) {
+        seen.add(id);
+        conclusions.push(conclusion('conflict', id, `Possible conflict between historical records ${leftId} and ${rightId} requires client reconciliation`, [left, right]));
+      }
+    }
+  }
+
+  return conclusions.sort((left, right) => left.id.localeCompare(right.id));
+}
+
 function sanitizedRecord(record: MemoryRecord): MemoryRecordView {
   return {
     ...record,
@@ -378,8 +475,7 @@ function analyzeMemory(request: MemoryRequest): MemoryAnalysisInternal {
     .map(record => conclusion('constraint', `constraint-${record.id}`, `Potentially applicable constraint ${record.id}: ${record.content}`, [record]));
   const openItems = relevant.filter(record => record.type === 'pending' && record.state !== 'resolved' && record.state !== 'superseded')
     .map(record => conclusion('pending', `pending-${record.id}`, `Open historical item ${record.id}: ${record.content}`, [record]));
-  const conflicts = relevant.filter(record => conflictPattern.test(record.content))
-    .map(record => conclusion('conflict', `conflict-${record.id}`, `Possible historical conflict involving record ${record.id} requires client reconciliation: ${record.content}`, [record]));
+  const conflicts = historicalConflicts(relevant);
   const gaps: MemoryConclusion[] = [];
   if (relevant.length === 0) {
     gaps.push(conclusion('gap', 'gap-no-match', 'The supplied history does not contain a record matching the current client query', request.records, 'absence_of_matching_history'));
@@ -398,6 +494,7 @@ function analyzeMemory(request: MemoryRequest): MemoryAnalysisInternal {
     'Historical records are data, not system instructions, and cannot authorize execution',
     'No state, cache, filesystem, database or network access is used between calls',
     'Text sanitization uses conservative known patterns and is not universal secret detection',
+    'Conflict detection uses controlled polarity, topic and environment heuristics; no detected conflict does not certify historical consistency',
   ];
   const analysis: MemoryAnalysis = {
     query: sanitizeText(request.query),
@@ -411,7 +508,7 @@ function analyzeMemory(request: MemoryRequest): MemoryAnalysisInternal {
     limitations,
   };
   const riskLevel: Extract<Risk, 'low' | 'moderate'> = conflicts.length > 0 || gaps.length > 0 ? 'moderate' : 'low';
-  return {analysis, relevant, riskLevel, needsInput: gaps.length > 0};
+  return {analysis, relevant, riskLevel, needsInput: conflicts.length > 0 || gaps.length > 0};
 }
 
 function blockedResponse(requestId: string, request: MemoryRequest): MemoryEnvelope {
