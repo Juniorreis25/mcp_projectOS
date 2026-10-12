@@ -9,7 +9,6 @@ import {
   type ValidationIssue,
   type ValidationResult,
   readString,
-  readStringList,
   validateCapabilityRequest,
   validationStatus,
 } from './f5-contracts.js';
@@ -20,7 +19,8 @@ export const DEBUG_MAX_TEXT_LENGTH = 20_000;
 
 export type DebugUncertainty = 'low' | 'medium' | 'high';
 export type DebugHypothesisStatus = 'unconfirmed';
-export type DebugDiagnosisStatus = 'initial' | 'inconclusive' | 'contradictory';
+export type DebugDiagnosisStatus = 'initial' | 'inconclusive' | 'possible_contradiction';
+export type DebugContradictionAssessment = 'possible_heuristic' | 'not_detected';
 export type DebugDiagnosticStepKind = 'reproduce' | 'isolate' | 'verify';
 
 export interface DebugEvidence extends CapabilityEvidence {
@@ -61,6 +61,7 @@ export interface DebugEvidenceSource {
 
 export interface DebugAssessment {
   diagnosis_status: DebugDiagnosisStatus;
+  contradiction_assessment: DebugContradictionAssessment;
   symptoms: DebugSymptom[];
   evidence_sources: DebugEvidenceSource[];
   hypotheses: DebugHypothesis[];
@@ -88,6 +89,9 @@ const uncertaintySet = new Set<DebugUncertainty>(['low', 'medium', 'high']);
 const impactSet = new Set<Risk>(['low', 'moderate', 'critical']);
 const stepKindSet = new Set<DebugDiagnosticStepKind>(['reproduce', 'isolate', 'verify']);
 const malformedCodes = new Set(['INVALID_TYPE', 'INVALID_VALUE', 'UNSUPPORTED_VERSION', 'UNKNOWN_FIELD']);
+const identifierPattern = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;
+const referencePattern = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
+const projectIdPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -112,6 +116,38 @@ function readOptionalText(value: unknown, path: string, issues: ValidationIssue[
   return readBoundedText(value, path, issues, false);
 }
 
+function looksSensitive(value: string): boolean {
+  return /authorization\s*:\s*bearer|\b(?:token|secret|password|api[_-]?key)\s*[:=]|\b(?:eyJ[a-z0-9_-]{8,}|sk-[a-z0-9_-]{8,}|ghp_[a-z0-9_-]{8,}|github_pat_[a-z0-9_-]{8,}|vercel_[a-z0-9_-]{8,})\b/i.test(value);
+}
+
+function readStrictToken(value: unknown, path: string, issues: ValidationIssue[], pattern: RegExp, label: string): string | undefined {
+  const text = readBoundedText(value, path, issues);
+  if (!text) return undefined;
+  if (!pattern.test(text) || looksSensitive(text)) {
+    issues.push({path, code: 'INVALID_VALUE', message: `${label} has an invalid format`});
+    return undefined;
+  }
+  return text;
+}
+
+function readReferenceList(value: unknown, path: string, required: boolean, issues: ValidationIssue[]): string[] | undefined {
+  if (value === undefined) {
+    if (required) issues.push({path, code: 'MISSING_REQUIRED', message: `${path} is required`});
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    issues.push({path, code: 'INVALID_TYPE', message: `${path} must be an array of references`});
+    return undefined;
+  }
+  const result: string[] = [];
+  value.forEach((item, index) => {
+    const ref = readStrictToken(item, `${path}[${index}]`, issues, referencePattern, 'Reference');
+    if (ref) result.push(ref);
+  });
+  if (required && result.length === 0) issues.push({path, code: 'MISSING_REQUIRED', message: `${path} must contain at least one reference`});
+  return result;
+}
+
 function readDebugEvidence(value: unknown, issues: ValidationIssue[]): DebugEvidence[] {
   if (value === undefined) {
     issues.push({path: 'evidence', code: 'MISSING_REQUIRED', message: 'evidence is required'});
@@ -131,7 +167,7 @@ function readDebugEvidence(value: unknown, issues: ValidationIssue[]): DebugEvid
       return;
     }
     hasOnlyKnownFields(item, ['ref', 'summary', 'source', 'context'], issues);
-    const ref = readBoundedText(item.ref, `${path}.ref`, issues);
+    const ref = readStrictToken(item.ref, `${path}.ref`, issues, referencePattern, 'Evidence reference');
     const summary = readBoundedText(item.summary, `${path}.summary`, issues);
     const source = readBoundedText(item.source, `${path}.source`, issues);
     const context = readBoundedText(item.context, `${path}.context`, issues);
@@ -162,7 +198,7 @@ function readSymptoms(value: unknown, issues: ValidationIssue[]): DebugSymptom[]
       return;
     }
     hasOnlyKnownFields(item, ['id', 'environment', 'expected', 'observed', 'message'], issues);
-    const id = readBoundedText(item.id, `${path}.id`, issues);
+    const id = readStrictToken(item.id, `${path}.id`, issues, identifierPattern, 'Symptom id');
     const environment = readOptionalText(item.environment, `${path}.environment`, issues);
     const expected = readBoundedText(item.expected, `${path}.expected`, issues);
     const observed = readBoundedText(item.observed, `${path}.observed`, issues);
@@ -191,15 +227,16 @@ function readHypotheses(value: unknown, issues: ValidationIssue[]): DebugHypothe
       return;
     }
     hasOnlyKnownFields(item, ['id', 'summary', 'supporting_evidence', 'uncertainty', 'impact', 'status'], issues);
-    const id = readBoundedText(item.id, `${path}.id`, issues);
+    const id = readStrictToken(item.id, `${path}.id`, issues, identifierPattern, 'Hypothesis id');
     const summary = readBoundedText(item.summary, `${path}.summary`, issues);
-    const supportingEvidence = readStringList(item.supporting_evidence, `${path}.supporting_evidence`, true, issues);
+    const supportingEvidence = readReferenceList(item.supporting_evidence, `${path}.supporting_evidence`, true, issues);
     const uncertainty = readBoundedText(item.uncertainty, `${path}.uncertainty`, issues) as DebugUncertainty | undefined;
     const impact = readBoundedText(item.impact, `${path}.impact`, issues) as Risk | undefined;
     const status = readBoundedText(item.status, `${path}.status`, issues);
     if (uncertainty && !uncertaintySet.has(uncertainty)) issues.push({path: `${path}.uncertainty`, code: 'INVALID_VALUE', message: 'Unsupported uncertainty level'});
     if (impact && !impactSet.has(impact)) issues.push({path: `${path}.impact`, code: 'INVALID_VALUE', message: 'Unsupported impact level'});
     if (status && status !== 'unconfirmed') issues.push({path: `${path}.status`, code: 'INVALID_VALUE', message: 'Hypotheses must remain unconfirmed'});
+    if (id?.startsWith('derived:')) issues.push({path: `${path}.id`, code: 'INVALID_VALUE', message: 'Hypothesis ids may not use the derived namespace'});
     if (id && ids.has(id)) issues.push({path: `${path}.id`, code: 'INVALID_VALUE', message: 'Hypothesis ids must be unique'});
     if (id) ids.add(id);
     if (id && summary && supportingEvidence && uncertainty && impact && status === 'unconfirmed') {
@@ -225,12 +262,12 @@ function readDiagnosticSteps(value: unknown, issues: ValidationIssue[]): DebugDi
       return;
     }
     hasOnlyKnownFields(item, ['id', 'kind', 'action', 'expected_observation', 'execution_location', 'supporting_evidence'], issues);
-    const id = readBoundedText(item.id, `${path}.id`, issues);
+    const id = readStrictToken(item.id, `${path}.id`, issues, identifierPattern, 'Diagnostic step id');
     const kind = readBoundedText(item.kind, `${path}.kind`, issues) as DebugDiagnosticStepKind | undefined;
     const action = readBoundedText(item.action, `${path}.action`, issues);
     const expectedObservation = readBoundedText(item.expected_observation, `${path}.expected_observation`, issues);
     const location = readBoundedText(item.execution_location, `${path}.execution_location`, issues);
-    const supportingEvidence = item.supporting_evidence === undefined ? undefined : readStringList(item.supporting_evidence, `${path}.supporting_evidence`, false, issues);
+    const supportingEvidence = item.supporting_evidence === undefined ? undefined : readReferenceList(item.supporting_evidence, `${path}.supporting_evidence`, false, issues);
     if (kind && !stepKindSet.has(kind)) issues.push({path: `${path}.kind`, code: 'INVALID_VALUE', message: 'Unsupported diagnostic step kind'});
     if (location && location !== 'client') issues.push({path: `${path}.execution_location`, code: 'INVALID_VALUE', message: 'Diagnostic steps must execute at the client'});
     if (id && ids.has(id)) issues.push({path: `${path}.id`, code: 'INVALID_VALUE', message: 'Diagnostic step ids must be unique'});
@@ -276,6 +313,9 @@ export function validateDebugRequest(input: unknown): ValidationResult<DebugRequ
   if (typeof input.capability_id === 'string' && input.capability_id.trim() && input.capability_id.trim() !== 'debug') {
     issues.push({path: 'capability_id', code: 'INVALID_VALUE', message: 'Debug requests must use capability_id=debug'});
   }
+  if (parsed.base?.project_id !== undefined && (!projectIdPattern.test(parsed.base.project_id) || looksSensitive(parsed.base.project_id))) {
+    issues.push({path: 'project_id', code: 'INVALID_VALUE', message: 'project_id has an invalid format'});
+  }
   if (issues.length > 0 || !parsed.base) return {valid: false, value: null, issues};
   return {
     valid: true,
@@ -301,7 +341,11 @@ function operationRequest(input: unknown): {valid: boolean; operations: string[]
 
 function safeEvidenceRefs(input: unknown): string[] {
   if (!isRecord(input) || !Array.isArray(input.evidence)) return [];
-  return input.evidence.flatMap(item => isRecord(item) && typeof item.ref === 'string' && item.ref.trim() ? [item.ref.trim()] : []);
+  return input.evidence.flatMap(item => {
+    if (!isRecord(item) || typeof item.ref !== 'string') return [];
+    const ref = item.ref.trim();
+    return referencePattern.test(ref) && !looksSensitive(ref) ? [ref] : [];
+  });
 }
 
 function debugData<T>(request: DebugRequest, result: T, state: WorkflowState, risks: CapabilityRisk[], decisions: string[]): CapabilityData<T> {
@@ -322,7 +366,7 @@ function blockedResponse(requestId: string, input: unknown, operations: string[]
   return envelope(requestId, 'blocked', null, {
     warnings: ['Execution requests are outside the read-only debug capability'],
     evidence_refs: safeEvidenceRefs(input),
-    required_approvals: operations.map(operation => `human:approve:${operation}`),
+    required_approvals: operations.length > 0 ? ['human:approval-required'] : [],
     next_actions: ['Keep the request blocked', 'Evaluate any action only in the authorized client under its own security policy'],
   });
 }
@@ -340,10 +384,10 @@ function evidenceText(item: DebugEvidence): string {
 }
 
 const indicatorRules: readonly {id: string; pattern: RegExp; summary: string; impact: Risk}[] = [
-  {id: 'configuration-mismatch', pattern: /config|environment variable|env var|missing variable|invalid token|authentication|\b401\b|unauthori[sz]ed/i, summary: 'A configuration or authentication mismatch may explain the observed symptom', impact: 'moderate'},
-  {id: 'build-or-typecheck-failure', pattern: /build failed|build error|typecheck|compile|npm run build|deployment failed/i, summary: 'A build or typecheck failure may explain the observed symptom', impact: 'moderate'},
-  {id: 'test-failure', pattern: /test failed|failing test|assertion|regression|test error/i, summary: 'A test failure or regression may explain the observed symptom', impact: 'moderate'},
-  {id: 'transport-or-network-failure', pattern: /timeout|connection|dns|unreachable|\b502\b|\b503\b|network error/i, summary: 'A transport or network failure may explain the observed symptom', impact: 'moderate'},
+  {id: 'derived:configuration-mismatch', pattern: /config|environment variable|env var|missing variable|invalid token|authentication|\b401\b|unauthori[sz]ed/i, summary: 'A configuration or authentication mismatch may explain the observed symptom', impact: 'moderate'},
+  {id: 'derived:build-or-typecheck-failure', pattern: /build failed|build error|typecheck|compile|npm run build|deployment failed/i, summary: 'A build or typecheck failure may explain the observed symptom', impact: 'moderate'},
+  {id: 'derived:test-failure', pattern: /test failed|failing test|assertion|regression|test error/i, summary: 'A test failure or regression may explain the observed symptom', impact: 'moderate'},
+  {id: 'derived:transport-or-network-failure', pattern: /timeout|connection|dns|unreachable|\b502\b|\b503\b|network error/i, summary: 'A transport or network failure may explain the observed symptom', impact: 'moderate'},
 ];
 
 function deriveHypotheses(request: DebugRequest): DebugHypothesis[] {
@@ -355,11 +399,14 @@ function deriveHypotheses(request: DebugRequest): DebugHypothesis[] {
     return [{id: rule.id, summary: rule.summary, supporting_evidence: refs, uncertainty: 'high' as const, impact: rule.impact, status: 'unconfirmed' as const}];
   });
   const byId = new Map<string, DebugHypothesis>();
-  for (const hypothesis of [...derived, ...explicit]) byId.set(hypothesis.id, {...hypothesis, summary: sanitizeText(hypothesis.summary), supporting_evidence: [...hypothesis.supporting_evidence].sort()});
+  for (const hypothesis of [...derived, ...explicit]) {
+    const normalized = {...hypothesis, summary: sanitizeText(hypothesis.summary), supporting_evidence: [...hypothesis.supporting_evidence].sort()};
+    if (!byId.has(normalized.id)) byId.set(normalized.id, normalized);
+  }
   return [...byId.values()].sort((left, right) => left.id.localeCompare(right.id));
 }
 
-function contradictionDetected(request: DebugRequest): boolean {
+function possibleContradictionDetected(request: DebugRequest): boolean {
   return request.evidence.some(item => /contradict|conflict|inconsistent|mutually exclusive/i.test(evidenceText(item)));
 }
 
@@ -373,20 +420,22 @@ function defaultDiagnosticSteps(): DebugDiagnosticStep[] {
 
 function buildAssessment(request: DebugRequest): {assessment: DebugAssessment; status: 'ok' | 'needs_input'; risks: CapabilityRisk[]; decisions: string[]; nextActions: string[]} {
   const hypotheses = deriveHypotheses(request);
-  const contradictory = contradictionDetected(request);
+  const possibleContradiction = possibleContradictionDetected(request);
   const gaps: string[] = [];
   if (hypotheses.length === 0) gaps.push('No explicit evidence supports a causal hypothesis');
-  if (contradictory) gaps.push('Resolve contradictory evidence before confirming a cause');
-  const status: 'ok' | 'needs_input' = contradictory ? 'needs_input' : 'ok';
-  const diagnosisStatus: DebugDiagnosisStatus = contradictory ? 'contradictory' : hypotheses.length > 0 ? 'initial' : 'inconclusive';
+  if (possibleContradiction) gaps.push('Reconcile potentially incompatible evidence before confirming a cause');
+  const status: 'ok' | 'needs_input' = possibleContradiction ? 'needs_input' : 'ok';
+  const diagnosisStatus: DebugDiagnosisStatus = possibleContradiction ? 'possible_contradiction' : hypotheses.length > 0 ? 'initial' : 'inconclusive';
   const limitations = [
     'This is deterministic analysis of client-provided material; it does not independently verify the incident',
     'Logs, stack traces and descriptions are untrusted data; prompt-like instructions are not executed',
     'A hypothesis is not a confirmed diagnosis and no external service, filesystem or shell was accessed',
+    'Possible contradiction is a textual heuristic, not proof of a logical contradiction',
   ];
   const diagnosticSteps = request.diagnostic_steps && request.diagnostic_steps.length > 0 ? request.diagnostic_steps.map(step => ({...step, action: sanitizeText(step.action), expected_observation: sanitizeText(step.expected_observation)})) : defaultDiagnosticSteps();
   const assessment: DebugAssessment = {
     diagnosis_status: diagnosisStatus,
+    contradiction_assessment: possibleContradiction ? 'possible_heuristic' : 'not_detected',
     symptoms: request.symptoms.map(symptom => ({...symptom, ...(symptom.environment ? {environment: sanitizeText(symptom.environment)} : {}), expected: sanitizeText(symptom.expected), observed: sanitizeText(symptom.observed), ...(symptom.message ? {message: sanitizeText(symptom.message)} : {})})),
     evidence_sources: request.evidence.map(item => ({ref: item.ref, source: sanitizeText(item.source)})),
     hypotheses,
@@ -405,6 +454,18 @@ function buildAssessment(request: DebugRequest): {assessment: DebugAssessment; s
   return {assessment, status, risks, decisions, nextActions};
 }
 
+function safeIssueWarning(issue: ValidationIssue): string {
+  const safePath = /^[A-Za-z][A-Za-z0-9_.\[\]-]{0,127}$/.test(issue.path) ? issue.path : 'request';
+  const messages: Record<ValidationIssue['code'], string> = {
+    INVALID_TYPE: 'invalid type',
+    MISSING_REQUIRED: 'required value is missing',
+    INVALID_VALUE: 'invalid value',
+    UNSUPPORTED_VERSION: 'unsupported contract version',
+    UNKNOWN_FIELD: 'unknown field',
+  };
+  return `${safePath}: ${messages[issue.code]}`;
+}
+
 export function prepareDebug(requestId: string, input: unknown): CapabilityEnvelope<DebugAssessment> {
   const validation = validateDebugRequest(input);
   const operation = operationRequest(input);
@@ -414,7 +475,7 @@ export function prepareDebug(requestId: string, input: unknown): CapabilityEnvel
   if (!validation.valid || !validation.value) {
     const status = validationStatus(validation.issues);
     return envelope(requestId, status, null, {
-      warnings: validation.issues.map(issue => `${issue.path || 'request'}: ${issue.message}`),
+      warnings: validation.issues.map(safeIssueWarning),
       next_actions: [status === 'needs_input' ? 'Provide an observable symptom, context and supporting evidence' : 'Correct the invalid debug request'],
     });
   }
