@@ -4,6 +4,8 @@ import { F5_CONTRACT_VERSION, type ValidationIssue, type ValidationResult } from
 export const IDEA_CONTRACT_VERSION = F5_CONTRACT_VERSION;
 export const IDEA_MAX_TEXT_LENGTH = 20_000;
 export const IDEA_MAX_LIST_ITEMS = 100;
+export const IDEA_MAX_VALIDATION_WARNINGS = 20;
+export const IDEA_MAX_WARNING_LENGTH = 160;
 
 export type IdeaStatusEnvelope = Envelope<IdeaData<IdeaProposal> | null>;
 
@@ -129,6 +131,33 @@ function readTextList(value: unknown, path: string, required: boolean, issues: V
   return result;
 }
 
+function readReferenceList(value: unknown, path: string, issues: ValidationIssue[]): string[] | undefined {
+  if (value === undefined) {
+    issues.push({path, code: 'MISSING_REQUIRED', message: `${path} is required`});
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    issues.push({path, code: 'INVALID_TYPE', message: `${path} must be an array of identifiers`});
+    return undefined;
+  }
+  if (value.length > IDEA_MAX_LIST_ITEMS) {
+    issues.push({path, code: 'INVALID_VALUE', message: `${path} contains too many items`});
+  }
+  const result: string[] = [];
+  const refs = new Set<string>();
+  value.forEach((item, index) => {
+    const ref = readIdentifier(item, `${path}[${index}]`, issues);
+    if (ref && refs.has(ref)) {
+      issues.push({path: `${path}[${index}]`, code: 'INVALID_VALUE', message: 'References must be unique within a hypothesis'});
+    }
+    if (ref) {
+      refs.add(ref);
+      result.push(ref);
+    }
+  });
+  return result;
+}
+
 function readEvidence(value: unknown, issues: ValidationIssue[]): IdeaEvidence[] | undefined {
   if (value === undefined) {
     issues.push({path: 'evidence', code: 'MISSING_REQUIRED', message: 'evidence is required'});
@@ -182,7 +211,7 @@ function readHypotheses(value: unknown, issues: ValidationIssue[]): IdeaHypothes
     hasOnlyKnownFields(item, ['id', 'statement', 'evidence_refs'], issues, path);
     const id = readIdentifier(item.id, `${path}.id`, issues);
     const statement = readText(item.statement, `${path}.statement`, true, issues);
-    const evidenceRefs = readTextList(item.evidence_refs, `${path}.evidence_refs`, true, issues);
+    const evidenceRefs = readReferenceList(item.evidence_refs, `${path}.evidence_refs`, issues);
     if (id && ids.has(id)) issues.push({path: `${path}.id`, code: 'INVALID_VALUE', message: 'Hypothesis identifiers must be unique'});
     if (id) ids.add(id);
     if (id && statement && evidenceRefs) hypotheses.push({id, statement, evidence_refs: evidenceRefs});
@@ -217,11 +246,9 @@ function readRequest(input: Record<string, unknown>, issues: ValidationIssue[]):
   }
 
   const evidenceRefs = new Set((evidence ?? []).map(item => item.ref));
-  if (evidenceRefs.size > 0) {
-    for (const [index, hypothesis] of (hypotheses ?? []).entries()) {
-      for (const ref of hypothesis.evidence_refs) {
-        if (!evidenceRefs.has(ref)) issues.push({path: `hypotheses[${index}].evidence_refs`, code: 'INVALID_VALUE', message: 'Hypothesis references unknown evidence'});
-      }
+  for (const [index, hypothesis] of (hypotheses ?? []).entries()) {
+    for (const ref of hypothesis.evidence_refs) {
+      if (!evidenceRefs.has(ref)) issues.push({path: `hypotheses[${index}].evidence_refs`, code: 'INVALID_VALUE', message: 'Hypothesis references unknown evidence'});
     }
   }
 
@@ -269,8 +296,33 @@ function ambiguousIdea(request: IdeaRequest): boolean {
   return genericObjectivePattern.test(request.objective) || genericObjectivePattern.test(request.problem);
 }
 
+const safeIssuePathPatterns: readonly RegExp[] = [
+  /^(?:capability_id|capability_version|project_id|objective|problem|target_audience|benefits|constraints|hypotheses|evidence|requested_operations|approvals)$/,
+  /^(?:benefits|constraints|requested_operations|approvals)\[\d{1,3}\]$/,
+  /^evidence\[\d{1,3}\]\.(?:ref|summary)$/,
+  /^hypotheses\[\d{1,3}\]\.(?:id|statement|evidence_refs)$/,
+  /^hypotheses\[\d{1,3}\]\.evidence_refs\[\d{1,3}\]$/,
+];
+
+function safeIssuePath(path: string): string {
+  if (path.length <= IDEA_MAX_WARNING_LENGTH && safeIssuePathPatterns.some(pattern => pattern.test(path))) return path;
+  return 'request';
+}
+
+function safeIssueMessage(code: ValidationIssue['code']): string {
+  switch (code) {
+    case 'MISSING_REQUIRED': return 'Required input is missing';
+    case 'INVALID_TYPE': return 'Input type is invalid';
+    case 'INVALID_VALUE': return 'Input value is invalid';
+    case 'UNSUPPORTED_VERSION': return 'Contract version is unsupported';
+    case 'UNKNOWN_FIELD': return 'Input contains an unknown field';
+  }
+}
+
 function warningsForValidation(issues: ValidationIssue[]): string[] {
-  return issues.map(issue => `${issue.path || 'request'}: ${issue.message}`);
+  const warnings = issues.slice(0, IDEA_MAX_VALIDATION_WARNINGS).map(issue => `${safeIssuePath(issue.path)}: ${safeIssueMessage(issue.code)}`);
+  if (issues.length > IDEA_MAX_VALIDATION_WARNINGS) warnings.push('request: Additional validation issues omitted');
+  return warnings.map(warning => warning.slice(0, IDEA_MAX_WARNING_LENGTH));
 }
 
 function blockedResponse(requestId: string, request: IdeaRequest): IdeaStatusEnvelope {
