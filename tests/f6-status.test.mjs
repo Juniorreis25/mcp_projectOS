@@ -48,7 +48,7 @@ test('consolidates a coherent snapshot without certifying it', () => {
     not_started: 0,
     unknown: 0,
     declared_progress_percent: 50,
-    verifiable_progress_percent: 50,
+    evidence_linked_progress_percent: 50,
   });
   assert.equal(response.data?.proposal_or_findings.milestone_assessments[0].evidence_sufficient, true);
   assert.equal(response.data?.proposal_or_findings.milestone_assessments[0].declared, true);
@@ -206,4 +206,74 @@ test('handles all declared milestone states conservatively', () => {
   assert.equal(response.data?.proposal_or_findings.counts.blocked, 1);
   assert.equal(response.data?.proposal_or_findings.counts.not_started, 1);
   assert.equal(response.data?.proposal_or_findings.counts.unknown, 1);
+});
+
+test('treats a blocked milestone as a material blocker without explicit blockers', () => {
+  const response = prepareStatus('status-blocked-milestone', request({
+    milestones: [{id: 'm-blocked', title: 'Security review', state: 'blocked', evidence_refs: []}],
+    blockers: [],
+    risks: [],
+  }));
+  assert.equal(response.status, 'needs_input');
+  assert.equal(response.data?.proposal_or_findings.readiness, 'needs_reconciliation');
+  assert.match(response.data?.proposal_or_findings.evidence_gaps.join(' '), /m-blocked.*blocked/);
+  assert.match(response.data?.proposal_or_findings.client_next_steps.join(' '), /m-blocked.*Resolve|Resolve.*m-blocked/);
+});
+
+test('completed milestones do not neutralize a blocked milestone', () => {
+  const response = prepareStatus('status-completed-and-blocked', request({
+    milestones: [
+      {id: 'm-complete', title: 'Completed work', state: 'completed', evidence_refs: ['delivery-1']},
+      {id: 'm-blocked', title: 'Blocked work', state: 'blocked', evidence_refs: []},
+    ],
+    blockers: [],
+    risks: [],
+  }));
+  assert.equal(response.status, 'needs_input');
+  assert.equal(response.data?.proposal_or_findings.readiness, 'needs_reconciliation');
+  assert.equal(response.data?.proposal_or_findings.counts.completed, 1);
+  assert.equal(response.data?.proposal_or_findings.counts.blocked, 1);
+});
+
+test('tracks multiple blocked milestones deterministically', () => {
+  const input = request({
+    milestones: [
+      {id: 'm-zeta', title: 'Zeta', state: 'blocked', evidence_refs: []},
+      {id: 'm-alpha', title: 'Alpha', state: 'blocked', evidence_refs: []},
+    ],
+    blockers: [],
+    risks: [],
+  });
+  const first = prepareStatus('status-multiple-blocked', input);
+  const second = prepareStatus('status-multiple-blocked', {...input, milestones: [...input.milestones].reverse()});
+  assert.deepEqual(first, second);
+  assert.equal(first.status, 'needs_input');
+  assert.equal(first.data?.proposal_or_findings.readiness, 'needs_reconciliation');
+  assert.deepEqual(first.data?.proposal_or_findings.milestone_assessments.map(item => item.id), ['m-alpha', 'm-zeta']);
+  assert.deepEqual(first.data?.proposal_or_findings.client_next_steps.filter(step => step.includes('Resolve blocked milestone')), [
+    'Resolve blocked milestone m-alpha in the authorized client',
+    'Resolve blocked milestone m-zeta in the authorized client',
+  ]);
+});
+
+test('keeps explicit blockers material when no milestone is blocked', () => {
+  const response = prepareStatus('status-explicit-blocker', request({
+    milestones: [{id: 'm-review', title: 'Review', state: 'in_progress', evidence_refs: []}],
+    blockers: ['Client approval is unavailable'],
+    risks: [],
+  }));
+  assert.equal(response.status, 'needs_input');
+  assert.equal(response.data?.proposal_or_findings.readiness, 'needs_reconciliation');
+  assert.match(response.data?.proposal_or_findings.blockers.join(' '), /approval/);
+});
+
+test('preserves critical risk severity alongside blocked milestones', () => {
+  const response = prepareStatus('status-critical-and-blocked', request({
+    milestones: [{id: 'm-blocked', title: 'Blocked', state: 'blocked', evidence_refs: []}],
+    risks: [{id: 'risk-critical', level: 'critical', summary: 'Client-declared critical risk', evidence_refs: ['plan-1']}],
+    blockers: [],
+  }));
+  assert.equal(response.status, 'needs_input');
+  assert.equal(response.data?.proposal_or_findings.readiness, 'needs_reconciliation');
+  assert.equal(response.data?.risks.find(risk => risk.id === 'risk-critical')?.level, 'critical');
 });

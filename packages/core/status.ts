@@ -67,7 +67,7 @@ export interface StatusAssessment {
     not_started: number;
     unknown: number;
     declared_progress_percent?: number;
-    verifiable_progress_percent?: number;
+    evidence_linked_progress_percent?: number;
   };
   risks: StatusRiskInput[];
   blockers: string[];
@@ -392,6 +392,7 @@ function assessmentFor(request: StatusRequest): {assessment: StatusAssessment; r
   const contradictoryEvidence = sortedEvidence.some(item => contradictionPattern.test(item.summary));
   const completed = milestones.filter(item => item.state === 'completed');
   const completedWithEvidence = completed.filter(item => item.evidence_refs.length > 0);
+  const blockedMilestones = milestones.filter(item => item.state === 'blocked');
   const counts = {
     total: milestones.length,
     completed: completed.length,
@@ -402,12 +403,13 @@ function assessmentFor(request: StatusRequest): {assessment: StatusAssessment; r
     unknown: milestones.filter(item => item.state === 'unknown').length,
     ...(milestones.length > 0 ? {
       declared_progress_percent: Math.round((completed.length / milestones.length) * 100),
-      verifiable_progress_percent: Math.round((completedWithEvidence.length / milestones.length) * 100),
+      evidence_linked_progress_percent: Math.round((completedWithEvidence.length / milestones.length) * 100),
     } : {}),
   };
   const evidenceGaps: string[] = [];
   for (const milestone of milestones) {
     if (milestone.state === 'completed' && milestone.evidence_refs.length === 0) evidenceGaps.push(`Milestone ${milestone.id} is declared completed without evidence`);
+    if (milestone.state === 'blocked') evidenceGaps.push(`Milestone ${milestone.id} is blocked and requires client reconciliation`);
     if (milestone.state === 'unknown') evidenceGaps.push(`Milestone ${milestone.id} has an unknown state`);
   }
   if (request.evidence.length === 0) evidenceGaps.push('No client-provided evidence was supplied');
@@ -415,9 +417,9 @@ function assessmentFor(request: StatusRequest): {assessment: StatusAssessment; r
   if (request.milestones.length === 0) evidenceGaps.push('No milestones or deliverables were supplied');
 
   const criticalRisk = request.risks.some(risk => risk.level === 'critical');
-  const materialBlockers = request.blockers.length > 0 || request.dependencies.length > 0 || request.decisions_pending.length > 0;
+  const materialBlockers = request.blockers.length > 0 || blockedMilestones.length > 0 || request.dependencies.length > 0 || request.decisions_pending.length > 0;
   const needsInput = criticalRisk || materialBlockers || evidenceGaps.length > 0;
-  const readiness: StatusReadiness = criticalRisk || request.blockers.length > 0 ? 'needs_reconciliation' : needsInput ? 'insufficient_evidence' : 'informational';
+  const readiness: StatusReadiness = criticalRisk || request.blockers.length > 0 || blockedMilestones.length > 0 ? 'needs_reconciliation' : needsInput ? 'insufficient_evidence' : 'informational';
   const sanitizedRisks = [...request.risks].sort((left, right) => left.id.localeCompare(right.id)).map(risk => ({...risk, summary: sanitizeText(risk.summary), evidence_refs: [...risk.evidence_refs].sort()}));
   const riskEntries = sanitizedRisks.map(risk => ({
     id: risk.id,
@@ -441,11 +443,13 @@ function assessmentFor(request: StatusRequest): {assessment: StatusAssessment; r
   const limitations = [
     'This assessment analyzes only the client-provided snapshot and is not independent verification',
     'Progress percentages refer only to the supplied milestones and do not measure effort or real-world completion',
+    'Evidence-linked progress reflects only client-declared evidence references and is not independently verified',
     'The Core does not compare this snapshot with a current external state or persist it between sessions',
   ];
   const clientNextSteps = [
     'Review the consolidated status and evidence in the authorized client',
     ...(evidenceGaps.length > 0 ? ['Provide or reconcile the missing and contradictory evidence'] : []),
+    ...blockedMilestones.map(milestone => `Resolve blocked milestone ${milestone.id} in the authorized client`),
     ...(request.blockers.length > 0 ? ['Resolve the declared blockers before treating the project as ready'] : []),
     ...(request.decisions_pending.length > 0 ? ['Resolve pending decisions with the responsible client authority'] : []),
   ];
