@@ -18,7 +18,7 @@ export const TEST_MAX_ITEMS = 100;
 export const TEST_MAX_TEXT_LENGTH = 20_000;
 
 export type TestResultStatus = 'passed' | 'failed' | 'skipped' | 'blocked' | 'not_run';
-export type TestCoverage = 'covered' | 'failed' | 'blocked' | 'missing_test' | 'not_run' | 'missing_evidence' | 'contradictory';
+export type TestCoverage = 'covered' | 'failed' | 'blocked' | 'skipped' | 'missing_test' | 'not_run' | 'missing_evidence' | 'contradictory';
 export type TestAssessmentStatus = 'declared_with_evidence' | 'declared_without_evidence' | 'contradictory' | 'unknown_case';
 
 export interface TestEvidence extends CapabilityEvidence {
@@ -70,6 +70,7 @@ export interface TestMatrix {
 export interface TestAssessment {
   case_id: string;
   declared_status: TestResultStatus;
+  declared_statuses: TestResultStatus[];
   assessment: TestAssessmentStatus;
   evidence_links: string[];
   observation: string;
@@ -318,17 +319,19 @@ function blockedResponse(requestId: string, input: unknown, operations: string[]
 function assessmentFor(caseItem: TestCase, results: TestResult[], knownEvidence: Set<string>): TestAssessment | null {
   const matching = results.filter(result => result.case_id === caseItem.id);
   if (matching.length === 0) return null;
-  const statuses = new Set(matching.map(result => result.status));
+  const statusOrder: TestResultStatus[] = ['failed', 'blocked', 'skipped', 'not_run', 'passed'];
+  const declaredStatuses = [...new Set(matching.map(result => result.status))].sort((left, right) => statusOrder.indexOf(left) - statusOrder.indexOf(right));
   const links = [...new Set(matching.flatMap(result => result.evidence_links))];
-  if (statuses.size > 1) return {
+  if (declaredStatuses.length > 1) return {
     case_id: caseItem.id,
-    declared_status: 'not_run',
+    declared_status: declaredStatuses[0],
+    declared_statuses: declaredStatuses,
     assessment: 'contradictory',
     evidence_links: links,
     observation: 'Conflicting declared statuses were supplied for the same test case; no resolution was inferred.',
     independently_verified: false,
   };
-  const declaredStatus = matching[0].status;
+  const declaredStatus = declaredStatuses[0];
   const unknownLinks = links.filter(link => !knownEvidence.has(link));
   const assessment: TestAssessmentStatus = unknownLinks.length > 0 || (declaredStatus !== 'not_run' && links.length === 0)
     ? 'declared_without_evidence'
@@ -336,6 +339,7 @@ function assessmentFor(caseItem: TestCase, results: TestResult[], knownEvidence:
   return {
     case_id: caseItem.id,
     declared_status: declaredStatus,
+    declared_statuses: declaredStatuses,
     assessment,
     evidence_links: links,
     observation: assessment === 'declared_with_evidence'
@@ -349,6 +353,7 @@ function unknownCaseAssessments(results: TestResult[], knownCases: Set<string>):
   return results.filter(result => !knownCases.has(result.case_id)).map(result => ({
     case_id: result.case_id,
     declared_status: result.status,
+    declared_statuses: [result.status],
     assessment: 'unknown_case',
     evidence_links: [...result.evidence_links],
     observation: 'A result referenced a test case that was not supplied or generated; its outcome cannot be included in the traceability matrix.',
@@ -360,21 +365,25 @@ function coverageFor(criterion: string, cases: TestCase[], assessments: TestAsse
   const criterionCases = cases.filter(testCase => testCase.criterion_refs.includes(criterion));
   const criterionAssessments = criterionCases.map(testCase => assessments.find(assessment => assessment.case_id === testCase.id)).filter((assessment): assessment is TestAssessment => assessment !== undefined);
   const links = [...new Set(criterionAssessments.flatMap(assessment => assessment.evidence_links))];
-  const statuses = criterionAssessments.map(assessment => assessment.declared_status);
+  const statuses = [...new Set(criterionAssessments.flatMap(assessment => assessment.declared_statuses))];
+  const statusOrder: TestResultStatus[] = ['failed', 'blocked', 'skipped', 'not_run', 'passed'];
+  const aggregateStatus = statusOrder.find(status => statuses.includes(status));
   let coverage: TestCoverage = 'not_run';
   if (criterionCases.length === 0) coverage = 'missing_test';
   else if (criterionAssessments.some(assessment => assessment.assessment === 'contradictory')) coverage = 'contradictory';
   else if (criterionAssessments.some(assessment => assessment.assessment === 'declared_without_evidence')) coverage = 'missing_evidence';
-  else if (statuses.includes('failed')) coverage = 'failed';
-  else if (statuses.includes('blocked')) coverage = 'blocked';
+  else if (aggregateStatus === 'failed') coverage = 'failed';
+  else if (aggregateStatus === 'blocked') coverage = 'blocked';
+  else if (aggregateStatus === 'skipped') coverage = 'skipped';
+  else if (aggregateStatus === 'not_run') coverage = 'not_run';
   else if (criterionAssessments.length === 0) coverage = 'not_run';
-  else coverage = 'covered';
+  else if (aggregateStatus === 'passed') coverage = 'covered';
   return {
     criterion,
     test_case_ids: criterionCases.map(testCase => testCase.id),
     evidence_links: links,
     coverage,
-    declared_status: criterionAssessments.some(assessment => assessment.assessment === 'contradictory') ? 'contradictory' : statuses[0] ?? 'not_provided',
+    declared_status: criterionAssessments.some(assessment => assessment.assessment === 'contradictory') ? 'contradictory' : aggregateStatus ?? 'not_provided',
   };
 }
 
@@ -387,7 +396,10 @@ function buildEvaluation(request: TestRequest): {evaluation: TestEvaluation; nee
   const unknownAssessments = unknownCaseAssessments(results, knownCases);
   const allAssessments = [...assessments, ...unknownAssessments];
   const rows = request.acceptance_criteria.map(criterion => coverageFor(criterion, cases, assessments));
-  const unexecuted = cases.filter(testCase => !assessments.some(assessment => assessment.case_id === testCase.id)).map(testCase => testCase.id);
+  const unexecuted = cases.filter(testCase => {
+    const caseResults = results.filter(result => result.case_id === testCase.id);
+    return caseResults.length === 0 || caseResults.some(result => result.status === 'not_run' || result.status === 'skipped');
+  }).map(testCase => testCase.id);
   const needsInput: string[] = [];
   if (rows.some(row => row.coverage === 'missing_test')) needsInput.push('Provide a test case for every acceptance criterion');
   if (rows.some(row => row.coverage === 'missing_evidence')) needsInput.push('Provide resolvable evidence for declared test results');

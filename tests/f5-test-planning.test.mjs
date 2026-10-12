@@ -30,6 +30,15 @@ const secondTestCase = {
   execution_location: 'client',
 };
 
+const secondCaseSameCriterion = {
+  id: 'case-boundary-secondary',
+  title: 'Repeat the read-only boundary check',
+  criterion_refs: [criteria[0]],
+  verification: 'Repeat the client-side boundary verification independently',
+  expected: 'The server remains read-only',
+  execution_location: 'client',
+};
+
 const validRequest = {
   capability_id: 'test',
   capability_version: '1.0.0',
@@ -80,6 +89,51 @@ test('evaluates all declared result statuses without treating them as independen
     assert.equal(assessment?.declared_status, status);
     assert.equal(assessment?.independently_verified, false);
     assert.equal(assessment?.assessment, 'declared_with_evidence');
+  }
+});
+
+test('never marks skipped or not_run as covered and lists them as unexecuted', () => {
+  for (const status of ['skipped', 'not_run']) {
+    const response = prepareTest(`test-unexecuted-${status}`, {...completeRequest, results: [result(status)]});
+    assert.equal(response.status, 'ok');
+    assert.equal(response.data?.proposal_or_findings.matrix.rows[0].coverage, status);
+    assert.ok(response.data?.proposal_or_findings.matrix.unexecuted_case_ids.includes('case-boundary'));
+    assert.notEqual(response.data?.proposal_or_findings.matrix.rows[0].coverage, 'covered');
+  }
+});
+
+test('aggregates multiple cases with conservative order-independent precedence', () => {
+  const request = {
+    ...validRequest,
+    acceptance_criteria: [criteria[0]],
+    test_cases: [testCase, secondCaseSameCriterion],
+  };
+  const combinations = [
+    ['passed', 'failed', 'failed'],
+    ['passed', 'blocked', 'blocked'],
+    ['passed', 'skipped', 'skipped'],
+    ['passed', 'not_run', 'not_run'],
+  ];
+  for (const [firstStatus, secondStatus, expected] of combinations) {
+    const forward = prepareTest(`test-aggregate-forward-${firstStatus}`, {
+      ...request,
+      results: [
+        {...result(firstStatus), case_id: testCase.id},
+        {...result(secondStatus), case_id: secondCaseSameCriterion.id},
+      ],
+    });
+    const reverse = prepareTest(`test-aggregate-reverse-${firstStatus}`, {
+      ...request,
+      results: [
+        {...result(secondStatus), case_id: secondCaseSameCriterion.id},
+        {...result(firstStatus), case_id: testCase.id},
+      ],
+    });
+    for (const response of [forward, reverse]) {
+      assert.equal(response.status, 'ok');
+      assert.equal(response.data?.proposal_or_findings.matrix.rows[0].coverage, expected);
+      assert.equal(response.data?.proposal_or_findings.matrix.rows[0].declared_status, expected);
+    }
   }
 });
 
