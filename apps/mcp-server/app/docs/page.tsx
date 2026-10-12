@@ -8,6 +8,7 @@ import {
   publicTools,
   requestExamples,
   skillCatalog,
+  vsCodeConfigExample,
   workflows,
 } from '../../lib/docs-content';
 
@@ -56,7 +57,7 @@ export default function DocsPage() {
             <div className={styles.callout}><strong>Importante:</strong> o formato de configuração varia por cliente e host. Os exemplos abaixo refletem a configuração Codex registrada na F3; confirme a sintaxe da versão instalada antes de usar.</div>
             <div className={styles.grid}>
               <article className={styles.card}><span className={styles.status}>CODEX CLI · PROCEDIMENTO VERIFICADO</span><h3>Configuração por ambiente</h3><p>Use um bloco <code>[mcp_servers.projectos_f3]</code> com <code>url</code>, <code>bearer_token_env_var</code> e <code>env_http_headers</code>. Forneça as variáveis somente ao processo da sessão, confirme <code>codex mcp list</code> e valide a descoberta antes de invocar as tools.</p></article>
-              <article className={styles.card}><span className={styles.status}>VS CODE · HOST A VALIDAR</span><h3>Extension Host e Agent Host</h3><p>O VS Code registra servidores em <code>.vscode/mcp.json</code> com <code>servers</code>; o formato portátil documentado usa <code>.mcp.json</code> ou <code>~/.copilot/mcp-config.json</code> com <code>mcpServers</code>. No Extension Host, inputs de senha podem ser usados fora do controle de versão; no Agent Host, inputs interativos podem não ser encaminhados. Confirme em <strong>MCP: List Servers</strong> e nunca presuma a herança de credenciais.</p></article>
+              <article className={styles.card}><span className={styles.status}>VS CODE · EXTENSION HOST</span><h3>Host MCP nativo verificável</h3><p>O host MCP nativo do VS Code em uma sessão do Extension Host aceita a configuração <code>.vscode/mcp.json</code> abaixo. Use <strong>MCP: List Servers</strong> para iniciar e consultar o output do servidor. O Agent Host não recebe configurações com <code>${'{input:...}'}</code> por encaminhamento; a validação desse host e o fornecimento não interativo de segredos ficam explicitamente pendentes da F8.</p></article>
             </div>
           </section>
 
@@ -64,6 +65,10 @@ export default function DocsPage() {
             <h2>Autenticação segura</h2>
             <p className={styles.sectionIntro}>O endpoint exige Bearer do ProjectOS. Preview protegido pode exigir também o bypass de automação da Vercel, enviado como cabeçalho separado pelo cliente.</p>
             <CodeExample value={codexConfigExample} />
+            <h3 style={{ marginTop: 26 }}>Configuração VS Code validada por schema</h3>
+            <p>Salve este exemplo como <code>.vscode/mcp.json</code> para uma sessão do Extension Host. O VS Code solicita os dois valores como entradas protegidas e não os coloca no arquivo. Substitua apenas o placeholder do Preview e não versione valores reais.</p>
+            <CodeExample value={vsCodeConfigExample} />
+            <p className={styles.muted}>Pré-requisitos: VS Code com suporte MCP nativo e GitHub Copilot Chat habilitado. No Command Palette, use <strong>MCP: List Servers</strong>; confirme conexão, ferramentas descobertas e output. A configuração portátil <code>.mcp.json</code>/<code>~/.copilot/mcp-config.json</code> é destinada ao Agent Host, mas este exemplo interativo não é encaminhado para ele; não trate esse caminho como homologado antes da F8.</p>
             <p className={styles.muted}>Os valores são deliberadamente placeholders. <code>PROJECTOS_MCP_TOKEN</code> autentica o ProjectOS; <code>VERCEL_AUTOMATION_BYPASS_SECRET</code> atravessa a proteção do Preview quando autorizado. Production não é o alvo deste guia.</p>
           </section>
 

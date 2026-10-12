@@ -75,6 +75,33 @@ export const docsSections = [
 
 export const codexConfigExample = `[mcp_servers.projectos_f3]\nurl = "https://<preview>/mcp"\nbearer_token_env_var = "PROJECTOS_MCP_TOKEN"\nenv_http_headers = { "x-vercel-protection-bypass" = "VERCEL_AUTOMATION_BYPASS_SECRET" }`;
 
+export const vsCodeConfigExample = `{
+  "inputs": [
+    {
+      "type": "promptString",
+      "id": "projectos-token",
+      "description": "ProjectOS Bearer token (Preview)",
+      "password": true
+    },
+    {
+      "type": "promptString",
+      "id": "vercel-bypass",
+      "description": "Vercel Protection Bypass secret (Preview)",
+      "password": true
+    }
+  ],
+  "servers": {
+    "projectos": {
+      "type": "http",
+      "url": "https://<preview>/mcp",
+      "headers": {
+        "Authorization": "Bearer \${input:projectos-token}",
+        "x-vercel-protection-bypass": "\${input:vercel-bypass}"
+      }
+    }
+  }
+}`;
+
 export const requestExamples = {
   list: '{ }',
   get: '{ "id": "projectos.discover" }',
