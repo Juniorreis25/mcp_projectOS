@@ -58,8 +58,9 @@ export interface ReviewResult {
 }
 
 const reviewArtifactKinds = new Set<ReviewArtifactKind>(['diff', 'code', 'document', 'test', 'config', 'snapshot', 'other']);
-const sensitivePatterns: readonly {priority: ReviewPriority; pattern: RegExp; title: string; recommendation: string; kind: ReviewFindingKind}[] = [
+const sensitivePatterns: readonly {id: string; priority: ReviewPriority; pattern: RegExp; title: string; recommendation: string; kind: ReviewFindingKind}[] = [
   {
+    id: 'critical-indicator',
     priority: 'P0',
     pattern: /\b(?:remote\s+code\s+execution|credential\s+exfiltration|irreversible\s+data\s+loss)\b/i,
     title: 'Critical security or data-loss indicator',
@@ -67,6 +68,7 @@ const sensitivePatterns: readonly {priority: ReviewPriority; pattern: RegExp; ti
     kind: 'potential_risk',
   },
   {
+    id: 'sensitive-assignment',
     priority: 'P1',
     pattern: /\b(?:password|passwd|secret|api[_ -]?key|access[_ -]?token)\s*[:=]/i,
     title: 'Sensitive-looking value assignment',
@@ -74,6 +76,7 @@ const sensitivePatterns: readonly {priority: ReviewPriority; pattern: RegExp; ti
     kind: 'potential_risk',
   },
   {
+    id: 'destructive-indicator',
     priority: 'P1',
     pattern: /\b(?:rm\s+-rf|drop\s+table|truncate\s+table|force[- ]?push|destroy\s+production)\b/i,
     title: 'Destructive-operation indicator',
@@ -81,6 +84,7 @@ const sensitivePatterns: readonly {priority: ReviewPriority; pattern: RegExp; ti
     kind: 'potential_risk',
   },
   {
+    id: 'implementation-risk',
     priority: 'P2',
     pattern: /\b(?:breaking\s+change|migration\s+required|missing\s+authentication|missing\s+tests?)\b/i,
     title: 'Important implementation-risk indicator',
@@ -88,6 +92,7 @@ const sensitivePatterns: readonly {priority: ReviewPriority; pattern: RegExp; ti
     kind: 'potential_risk',
   },
   {
+    id: 'unresolved-marker',
     priority: 'P3',
     pattern: /\b(?:TODO|FIXME|TBD)\b/i,
     title: 'Unresolved implementation marker',
@@ -95,6 +100,7 @@ const sensitivePatterns: readonly {priority: ReviewPriority; pattern: RegExp; ti
     kind: 'information_gap',
   },
   {
+    id: 'instruction-like-text',
     priority: 'P3',
     pattern: /\b(?:ignore|disregard)\s+(?:all|any|the)\s+(?:previous|prior|system)\s+instructions?\b/i,
     title: 'Instruction-like text in supplied material',
@@ -102,6 +108,7 @@ const sensitivePatterns: readonly {priority: ReviewPriority; pattern: RegExp; ti
     kind: 'information_gap',
   },
   {
+    id: 'client-positive-marker',
     priority: 'P3',
     pattern: /\b(?:PASS|PASSED)\b/i,
     title: 'Client-reported positive marker',
@@ -151,11 +158,35 @@ function readSpecification(value: unknown, issues: ValidationIssue[]): SpecPropo
 }
 
 function readBoundedText(value: unknown, path: string, issues: ValidationIssue[]): string | undefined {
-  const text = readString(value, path, false, issues);
-  if (text && text.length > REVIEW_MAX_TEXT_LENGTH) {
+  if (value === undefined) {
+    issues.push({path, code: 'MISSING_REQUIRED', message: `${path} is required`});
+    return undefined;
+  }
+  if (typeof value !== 'string') {
+    issues.push({path, code: 'INVALID_TYPE', message: `${path} must be a string`});
+    return undefined;
+  }
+  if (!value.trim()) {
+    issues.push({path, code: 'MISSING_REQUIRED', message: `${path} must not be empty`});
+    return undefined;
+  }
+  if (value.length > REVIEW_MAX_TEXT_LENGTH) {
     issues.push({path, code: 'INVALID_VALUE', message: `${path} exceeds the maximum review input size`});
   }
-  return text;
+  return value;
+}
+
+function readOptionalDiff(value: unknown, path: string, issues: ValidationIssue[]): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string') {
+    issues.push({path, code: 'INVALID_TYPE', message: `${path} must be a string`});
+    return undefined;
+  }
+  if (!value.trim()) return undefined;
+  if (value.length > REVIEW_MAX_TEXT_LENGTH) {
+    issues.push({path, code: 'INVALID_VALUE', message: `${path} exceeds the maximum review input size`});
+  }
+  return value;
 }
 
 function readArtifacts(value: unknown, issues: ValidationIssue[]): ReviewArtifact[] | undefined {
@@ -192,7 +223,7 @@ export function validateReviewRequest(input: unknown): ValidationResult<ReviewRe
 
   const specification = readSpecification(input.specification, issues);
   const specificationRef = readString(input.specification_ref, 'specification_ref', true, issues);
-  const diff = input.diff === undefined ? undefined : readBoundedText(input.diff, 'diff', issues);
+  const diff = readOptionalDiff(input.diff, 'diff', issues);
   const artifacts = readArtifacts(input.artifacts, issues);
 
   if (base.value?.capability_id !== 'review') issues.push({path: 'capability_id', code: 'INVALID_VALUE', message: 'Review requests must use capability_id=review'});
@@ -271,23 +302,115 @@ function blockedResponse(requestId: string, input: unknown, operations: string[]
   });
 }
 
-function findingId(ref: string, index: number): string {
-  const normalized = ref.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  return `review-${normalized || 'material'}-${index + 1}`;
+type DiffLineKind = 'added' | 'removed' | 'context' | 'metadata';
+
+interface DiffLine {
+  kind: DiffLineKind;
+  text: string;
 }
 
-function findingsForArtifact(artifact: ReviewArtifact): ReviewFinding[] {
-  const match = sensitivePatterns.find(candidate => candidate.pattern.test(artifact.content));
-  if (!match) return [];
-  return [{
-    id: findingId(artifact.ref, 0),
-    priority: match.priority,
-    kind: match.kind,
-    title: match.title,
-    observation: `The supplied ${artifact.kind} material contains a textual indicator matching the review rule; this is not proof that the underlying issue is exploitable or authorized.`,
-    basis_refs: [artifact.ref],
-    recommendation: match.recommendation,
-  }];
+interface ParsedDiff {
+  valid: boolean;
+  lines: DiffLine[];
+  limitation?: string;
+}
+
+function parseUnifiedDiff(content: string, ref: string): ParsedDiff {
+  const sourceLines = content.split(/\r?\n/);
+  const hasOldHeader = sourceLines.some(line => line.startsWith('--- '));
+  const hasNewHeader = sourceLines.some(line => line.startsWith('+++ '));
+  const hasHunk = sourceLines.some(line => line.startsWith('@@ '));
+  if (!hasOldHeader || !hasNewHeader || !hasHunk) {
+    return {
+      valid: false,
+      lines: [{kind: 'metadata', text: content}],
+      limitation: `Material ${ref} was not recognized as a valid unified Git diff; introduced and removed provenance cannot be determined.`,
+    };
+  }
+
+  let inHunk = false;
+  const lines: DiffLine[] = [];
+  for (const line of sourceLines) {
+    if (line.startsWith('@@ ')) {
+      inHunk = true;
+      lines.push({kind: 'metadata', text: line});
+    } else if (line.startsWith('diff --git ') || line.startsWith('index ') || line.startsWith('--- ') || line.startsWith('+++ ') || line.startsWith('new file mode ') || line.startsWith('deleted file mode ')) {
+      lines.push({kind: 'metadata', text: line});
+    } else if (inHunk && line.startsWith('+')) {
+      lines.push({kind: 'added', text: line.slice(1)});
+    } else if (inHunk && line.startsWith('-')) {
+      lines.push({kind: 'removed', text: line.slice(1)});
+    } else if (inHunk && line.startsWith(' ')) {
+      lines.push({kind: 'context', text: line.slice(1)});
+    } else if (inHunk && line.startsWith('\\')) {
+      lines.push({kind: 'metadata', text: line});
+    } else if (inHunk && line.length > 0) {
+      return {
+        valid: false,
+        lines: [{kind: 'metadata', text: content}],
+        limitation: `Material ${ref} contains malformed hunk lines; introduced and removed provenance cannot be determined.`,
+      };
+    } else {
+      lines.push({kind: 'metadata', text: line});
+    }
+  }
+  return {valid: true, lines};
+}
+
+function findingId(ref: string, kind: ReviewArtifactKind, ruleId: string): string {
+  const normalized = ref.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return `review-${kind}-${normalized || 'material'}-${ruleId}`;
+}
+
+function findingKindForProvenance(ruleKind: ReviewFindingKind, provenance: string): ReviewFindingKind {
+  if (provenance.includes('removed') || provenance.includes('unknown')) return 'information_gap';
+  return ruleKind;
+}
+
+function countMatches(pattern: RegExp, text: string): number {
+  const flags = pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`;
+  return [...text.matchAll(new RegExp(pattern.source, flags))].length;
+}
+
+function findingsForArtifact(artifact: ReviewArtifact): {findings: ReviewFinding[]; limitation?: string} {
+  const parsed = artifact.kind === 'diff' ? parseUnifiedDiff(artifact.content, artifact.ref) : {valid: true, lines: [{kind: 'context' as const, text: artifact.content}]};
+  const findings: ReviewFinding[] = [];
+  sensitivePatterns.forEach(rule => {
+    const matchingKinds = new Set<DiffLineKind>();
+    let occurrenceCount = 0;
+    for (const line of parsed.lines) {
+      if (line.kind === 'metadata') continue;
+      const matches = countMatches(rule.pattern, line.text);
+      if (matches > 0) {
+        matchingKinds.add(line.kind);
+        occurrenceCount += matches;
+      }
+    }
+    if (occurrenceCount === 0) return;
+
+    let provenance = 'present in supplied material';
+    if (artifact.kind === 'diff' && parsed.valid) {
+      const hasAdded = matchingKinds.has('added');
+      const hasRemoved = matchingKinds.has('removed');
+      const hasContext = matchingKinds.has('context');
+      if (hasAdded && hasRemoved) provenance = 'present in added and removed lines; net effect is uncertain';
+      else if (hasAdded) provenance = 'present in added lines; potentially introduced by this diff';
+      else if (hasRemoved) provenance = 'present only in removed lines; historical context, not a newly introduced risk';
+      else if (hasContext) provenance = 'present only in context lines; not shown as introduced by this diff';
+    } else if (artifact.kind === 'diff') {
+      provenance = 'present in unclassified diff-like material; introduced or removed provenance is unknown';
+    }
+    findings.push({
+      id: findingId(artifact.ref, artifact.kind, rule.id),
+      priority: rule.priority,
+      kind: findingKindForProvenance(rule.kind, provenance),
+      title: rule.title,
+      observation: `The supplied ${artifact.kind} material contains ${occurrenceCount} occurrence${occurrenceCount === 1 ? '' : 's'} of a textual indicator; ${provenance}. This is not proof that the underlying issue is exploitable or authorized.`,
+      basis_refs: [artifact.ref],
+      recommendation: rule.recommendation,
+    });
+  });
+  return {findings, limitation: parsed.limitation};
 }
 
 function contradictoryEvidence(evidence: CapabilityEvidence[]): ReviewFinding | null {
@@ -340,9 +463,13 @@ export function prepareReview(requestId: string, input: unknown): CapabilityEnve
     ...(request.diff ? [{ref: 'inline-diff', kind: 'diff' as const, summary: 'Client-supplied inline diff', content: request.diff}] : []),
     ...artifacts,
   ];
-  const findings = materials.flatMap(findingsForArtifact);
+  const scans = materials.map(findingsForArtifact);
+  const findings = scans.flatMap(scan => scan.findings);
+  const diffLimitations = scans.flatMap(scan => scan.limitation ? [scan.limitation] : []);
   const contradiction = contradictoryEvidence(request.evidence);
   if (contradiction) findings.push(contradiction);
+  const priorityOrder: Record<ReviewPriority, number> = {P0: 0, P1: 1, P2: 2, P3: 3};
+  findings.sort((left, right) => priorityOrder[left.priority] - priorityOrder[right.priority] || left.id.localeCompare(right.id));
   const gaps = [...request.specification.unresolved_questions.map(question => `Unresolved specification question: ${question}`)];
   const recommendations = ['Review every finding in the authorized client', 'Do not interpret an empty finding set as approval, merge authorization or a security release'];
   if (gaps.length > 0) recommendations.push('Resolve the outstanding specification questions before relying on the review');
@@ -357,6 +484,7 @@ export function prepareReview(requestId: string, input: unknown): CapabilityEnve
       'This result is produced by deterministic rules over client-supplied material.',
       'Absence of a deterministic finding is not proof of safety, correctness, absence of regressions or approval.',
       'The server does not access repositories, filesystems, external services or pull requests.',
+      ...diffLimitations,
     ],
   };
   const risks = findings.filter(finding => finding.kind === 'potential_risk').map(riskFromFinding);

@@ -80,6 +80,96 @@ test('classifies P0 through P3 indicators as potential or information findings',
   assert.deepEqual(response.data?.proposal_or_findings.findings.map(finding => finding.kind), ['potential_risk', 'potential_risk', 'potential_risk', 'information_gap']);
 });
 
+test('emits multiple stable findings from one artifact and deduplicates repeated rule matches', () => {
+  const response = prepareReview('review-multiple-one-artifact', {
+    ...validReview,
+    artifacts: [{
+      ref: 'client:combined',
+      kind: 'document',
+      summary: 'One artifact with multiple indicators',
+      content: 'remote code execution; api_key = first; api_key = second; breaking change; TODO',
+    }],
+  });
+  assert.equal(response.status, 'ok');
+  const findings = response.data?.proposal_or_findings.findings ?? [];
+  assert.deepEqual(findings.map(finding => finding.priority), ['P0', 'P1', 'P2', 'P3']);
+  assert.equal(new Set(findings.map(finding => finding.id)).size, findings.length);
+  const sensitive = findings.find(finding => finding.title === 'Sensitive-looking value assignment');
+  assert.match(sensitive?.observation ?? '', /2 occurrences/);
+});
+
+const unifiedDiff = (body) => [
+  'diff --git a/src/example.ts b/src/example.ts',
+  'index 1111111..2222222 100644',
+  '--- a/src/example.ts',
+  '+++ b/src/example.ts',
+  '@@ -1,4 +1,4 @@',
+  ...body,
+].join('\n');
+
+test('distinguishes added, removed and both-sided indicators in valid unified diffs', () => {
+  const added = prepareReview('review-added', {...validReview, diff: unifiedDiff(['+api_key = newly-added'])});
+  const removed = prepareReview('review-removed', {...validReview, diff: unifiedDiff(['-api_key = old-value'])});
+  const both = prepareReview('review-both', {...validReview, diff: unifiedDiff(['-api_key = old-value', '+api_key = new-value'])});
+  const addedFinding = added.data?.proposal_or_findings.findings[0];
+  const removedFinding = removed.data?.proposal_or_findings.findings[0];
+  const bothFinding = both.data?.proposal_or_findings.findings[0];
+  assert.match(addedFinding?.observation ?? '', /potentially introduced by this diff/);
+  assert.equal(addedFinding?.kind, 'potential_risk');
+  assert.match(removedFinding?.observation ?? '', /historical context, not a newly introduced risk/);
+  assert.equal(removedFinding?.kind, 'information_gap');
+  assert.match(bothFinding?.observation ?? '', /net effect is uncertain/);
+  assert.equal(bothFinding?.kind, 'information_gap');
+});
+
+test('finds multiple risks in one valid unified diff without treating context as added', () => {
+  const response = prepareReview('review-multi-diff', {
+    ...validReview,
+    diff: unifiedDiff([
+      ' context api_key = existing-context',
+      '+remote code execution possible',
+      '+api_key = newly-added',
+      '+breaking change requires migration and missing tests',
+      '+TODO: document rollback',
+    ]),
+  });
+  assert.equal(response.status, 'ok');
+  const findings = response.data?.proposal_or_findings.findings ?? [];
+  assert.deepEqual(findings.map(finding => finding.priority), ['P0', 'P1', 'P2', 'P3']);
+  assert.ok(findings.every(finding => /added lines|context lines/.test(finding.observation)));
+  assert.equal(new Set(findings.map(finding => finding.id)).size, findings.length);
+});
+
+test('does not treat arbitrary text or malformed diff material as a valid Git diff', () => {
+  const plain = prepareReview('review-plain-diff', {
+    ...validReview,
+    diff: 'remote code execution possible',
+    artifacts: undefined,
+  });
+  const malformed = prepareReview('review-malformed-diff', {
+    ...validReview,
+    diff: ['--- a/file', '+++ b/file', '@@ -1 +1 @@', 'not-prefixed'].join('\n'),
+    artifacts: undefined,
+  });
+  for (const response of [plain, malformed]) {
+    assert.equal(response.status, 'ok');
+    assert.ok(response.data?.proposal_or_findings.limitations.some(item => /provenance cannot be determined/.test(item)));
+    assert.ok(response.data?.proposal_or_findings.findings.every(finding => !/introduced by this diff/.test(finding.observation)));
+  }
+});
+
+test('returns needs_input for absent or whitespace-only diff without another artifact', () => {
+  const absent = prepareReview('review-diff-absent', {...validReview, diff: undefined, artifacts: undefined});
+  const whitespace = prepareReview('review-diff-whitespace', {...validReview, diff: ' \n\t ', artifacts: undefined});
+  assert.equal(absent.status, 'needs_input');
+  assert.equal(whitespace.status, 'needs_input');
+});
+
+test('preserves error priority when invalid diff type coexists with absent material', () => {
+  const response = prepareReview('review-diff-type-error', {...validReview, diff: 42, artifacts: undefined});
+  assert.equal(response.status, 'error');
+});
+
 test('records client-reported positive markers as observations, never as a PASS decision', () => {
   const response = prepareReview('review-observation', {
     ...validReview,
