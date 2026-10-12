@@ -1,35 +1,32 @@
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { parseManifest, validateCatalog, type SkillManifest } from '../../../packages/skills/manifest';
 
 const skillSources = {
   'projectos.discover': {
-    manifest: new URL('../../../skills/discover/manifest.yaml', import.meta.url),
-    instructions: new URL('../../../skills/discover/SKILL.md', import.meta.url),
+    manifest: readFileSync(resolve(process.cwd(), '../../skills/discover/manifest.yaml'), 'utf8'),
+    instructions: readFileSync(resolve(process.cwd(), '../../skills/discover/SKILL.md'), 'utf8'),
   },
   'projectos.plan': {
-    manifest: new URL('../../../skills/plan/manifest.yaml', import.meta.url),
-    instructions: new URL('../../../skills/plan/SKILL.md', import.meta.url),
+    manifest: readFileSync(resolve(process.cwd(), '../../skills/plan/manifest.yaml'), 'utf8'),
+    instructions: readFileSync(resolve(process.cwd(), '../../skills/plan/SKILL.md'), 'utf8'),
   },
   'projectos.start': {
-    manifest: new URL('../../../skills/start/manifest.yaml', import.meta.url),
-    instructions: new URL('../../../skills/start/SKILL.md', import.meta.url),
+    manifest: readFileSync(resolve(process.cwd(), '../../skills/start/manifest.yaml'), 'utf8'),
+    instructions: readFileSync(resolve(process.cwd(), '../../skills/start/SKILL.md'), 'utf8'),
   },
 } as const;
 
 export type SkillId = keyof typeof skillSources;
 export type SkillDefinition = SkillManifest & { instructions: string; resources: string[] };
 
-function readFixedWorkspaceFile(filename: URL): string {
-  return readFileSync(filename, 'utf8');
-}
-
 function loadSkill(id: SkillId): SkillDefinition {
   const source = skillSources[id];
-  const manifest = parseManifest(readFixedWorkspaceFile(source.manifest));
+  const manifest = parseManifest(source.manifest);
   if (manifest.id !== id) throw new Error(`CONFLICT: manifest id mismatch for ${id}`);
   return {
     ...manifest,
-    instructions: readFixedWorkspaceFile(source.instructions),
+    instructions: source.instructions,
     resources: ['manifest.yaml', 'SKILL.md'],
   };
 }
