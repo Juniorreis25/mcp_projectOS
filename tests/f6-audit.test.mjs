@@ -110,6 +110,47 @@ test('uses declared events only as traceable, unverified audit data', () => {
   assert.match(response.data?.proposal_or_findings.limitations.join(' '), /client-provided|not independently verified/i);
 });
 
+test('flags an isolated contradictory event without evidence and traces its event id', () => {
+  const response = prepareAudit('audit-event-no-evidence', request({
+    events: [{id: 'evt-no-evidence', summary: 'Contradictory client event', evidence_refs: []}],
+  }));
+  assert.equal(response.status, 'needs_input');
+  const finding = response.data?.proposal_or_findings.findings.find(item => item.event_ids?.includes('evt-no-evidence'));
+  assert.deepEqual(finding?.event_ids, ['evt-no-evidence']);
+  assert.deepEqual(finding?.evidence_refs, []);
+  assert.match(response.data?.proposal_or_findings.evidence_gaps.join(' '), /evt-no-evidence.*no linked evidence/i);
+});
+
+test('preserves multiple contradictory event findings and their real evidence refs deterministically', () => {
+  const input = request({
+    events: [
+      {id: 'evt-zeta', summary: 'Conflicting event with evidence', evidence_refs: ['e-test']},
+      {id: 'evt-alpha', summary: 'Inconsistent event without evidence', evidence_refs: []},
+    ],
+  });
+  const first = prepareAudit('audit-events-order', input);
+  const second = prepareAudit('audit-events-order', {...input, events: [...input.events].reverse()});
+  assert.deepEqual(first, second);
+  const eventFindings = first.data?.proposal_or_findings.findings.filter(item => item.event_ids);
+  assert.deepEqual(eventFindings?.map(item => item.id), ['audit-contradictory-event-evt-alpha', 'audit-contradictory-event-evt-zeta']);
+  assert.deepEqual(eventFindings?.map(item => item.evidence_refs), [[], ['e-test']]);
+});
+
+test('does not create a contradiction finding for ordinary events', () => {
+  const response = prepareAudit('audit-event-normal', request({
+    events: [{id: 'evt-normal', summary: 'Client recorded a review checkpoint', evidence_refs: ['e-test']}],
+  }));
+  assert.equal(response.data?.proposal_or_findings.findings.some(item => item.kind === 'contradiction'), false);
+});
+
+test('documents the single-assessment-per-control boundary', () => {
+  const response = prepareAudit('audit-assessment-boundary', request());
+  assert.match(response.data?.proposal_or_findings.limitations.join(' '), /one assessment.*control|duplicate assessments.*structural/i);
+  assert.equal(prepareAudit('audit-duplicate-assessment', request({
+    assessments: [...request().assessments, {...request().assessments[0], id: 'a-auth-duplicate'}],
+  })).status, 'error');
+});
+
 test('rejects unknown references, duplicate IDs, unsupported versions and fields', () => {
   assert.equal(prepareAudit('audit-ref', request({assessments: [{...request().assessments[0], evidence_refs: ['missing']}, request().assessments[1]]})).status, 'error');
   assert.equal(prepareAudit('audit-id', request({controls: [...request().controls, {...request().controls[0], description: 'duplicate'}]})).status, 'error');

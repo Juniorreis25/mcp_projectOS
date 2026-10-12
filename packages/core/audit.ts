@@ -71,6 +71,7 @@ export interface AuditFinding {
   severity: AuditSeverity;
   control_id?: string;
   assessment_id?: string;
+  event_ids?: string[];
   evidence_refs: string[];
   summary: string;
 }
@@ -481,12 +482,27 @@ function buildAudit(request: AuditRequest): {report: AuditReport; risks: AuditDa
     }
   }
 
-  const contradictoryEvidenceRefs = request.evidence.filter(item => contradictionPattern.test(item.summary)).map(item => item.ref);
-  const contradictoryEventRefs = (request.events ?? []).filter(item => contradictionPattern.test(item.summary)).flatMap(item => item.evidence_refs);
-  const contradictoryRefs = [...new Set([...contradictoryEvidenceRefs, ...contradictoryEventRefs])].sort((left, right) => left.localeCompare(right));
-  if (contradictoryRefs.length > 0) {
-    findings.push({id: 'audit-contradictory-evidence', kind: 'contradiction', severity: 'moderate', evidence_refs: contradictoryRefs, summary: 'Client-provided evidence contains a possible contradiction requiring reconciliation'});
+  const contradictoryEvidenceRefs = request.evidence.filter(item => contradictionPattern.test(item.summary)).map(item => item.ref).sort((left, right) => left.localeCompare(right));
+  if (contradictoryEvidenceRefs.length > 0) {
+    findings.push({id: 'audit-contradictory-evidence', kind: 'contradiction', severity: 'moderate', evidence_refs: contradictoryEvidenceRefs, summary: 'Client-provided evidence contains a possible contradiction requiring reconciliation'});
     evidenceGaps.push('Client-provided evidence contains a possible contradiction');
+  }
+  for (const event of [...(request.events ?? [])].sort((left, right) => left.id.localeCompare(right.id))) {
+    if (!contradictionPattern.test(event.summary)) continue;
+    const eventEvidenceRefs = [...new Set(event.evidence_refs)].sort((left, right) => left.localeCompare(right));
+    findings.push({
+      id: `audit-contradictory-event-${event.id}`,
+      kind: 'contradiction',
+      severity: 'moderate',
+      event_ids: [event.id],
+      evidence_refs: eventEvidenceRefs,
+      summary: eventEvidenceRefs.length > 0
+        ? 'A client-declared event indicates a possible contradiction requiring reconciliation'
+        : 'A client-declared event indicates a possible contradiction but has no linked evidence',
+    });
+    evidenceGaps.push(eventEvidenceRefs.length > 0
+      ? `Event ${event.id} indicates a possible contradiction requiring reconciliation`
+      : `Event ${event.id} indicates a possible contradiction and has no linked evidence`);
   }
   if (request.approvals_pending.length > 0) {
     findings.push({id: 'audit-pending-approvals', kind: 'governance_gap', severity: 'moderate', evidence_refs: [], summary: 'Approvals remain pending in the client-provided audit context'});
@@ -525,6 +541,7 @@ function buildAudit(request: AuditRequest): {report: AuditReport; risks: AuditDa
       'Absence of findings is not certification of compliance, security, merge approval or release readiness',
       'The Core does not access external sources, filesystems, repositories or persistent storage',
       'Free-text sanitization covers known patterns and is not universal secret detection',
+      'At most one assessment is accepted per control; duplicate assessments are structural errors and are not semantically compared',
     ],
   };
   const risks: AuditData['risks'] = sortedFindings.map(finding => ({
