@@ -113,6 +113,15 @@ test('detects require versus waive approval for the same operation', () => {
   assert.ok(response.data?.proposal_or_findings.conflicts.some(item => item.record_ids.includes('require-approval') && item.record_ids.includes('waive-approval')));
 });
 
+test('detects controlled Portuguese polarity for the same scoped operation', () => {
+  const response = prepareMemory('memory-portuguese-polarity', conflictRequest([
+    historicalRecord('permitir-deploy', 'Permitir deploy em preview com aprovação'),
+    historicalRecord('proibir-deploy', 'Proibir deploy em preview sem aprovação', {evidence_refs: ['history-doc']}),
+  ]));
+  assert.equal(response.status, 'needs_input');
+  assert.ok(response.data?.proposal_or_findings.conflicts.some(item => item.record_ids.includes('permitir-deploy') && item.record_ids.includes('proibir-deploy')));
+});
+
 test('does not create false conflicts across distinct environments or unrelated topics', () => {
   const environmentResponse = prepareMemory('memory-environment-scope', conflictRequest([
     historicalRecord('allow-preview-deploy', 'Allow deploy in preview'),
