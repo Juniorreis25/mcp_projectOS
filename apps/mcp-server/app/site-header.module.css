@@ -1,0 +1,21 @@
+.header { position: sticky; top: 0; z-index: 20; border-bottom: 1px solid rgb(148 163 184 / 16%); background: rgb(8 17 35 / 88%); color: #f8fbff; backdrop-filter: blur(18px); }
+.inner { display: flex; width: min(1180px, calc(100% - 40px)); min-height: 76px; margin: 0 auto; align-items: center; justify-content: space-between; gap: 24px; }
+.brand { display: inline-flex; align-items: center; gap: 11px; color: inherit; font-size: 1rem; font-weight: 800; letter-spacing: -.02em; text-decoration: none; }
+.mark { position: relative; display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid rgb(94 240 176 / 72%); border-radius: 9px; background: rgb(94 240 176 / 14%); box-shadow: 0 0 24px rgb(94 240 176 / 18%); }
+.mark::before, .mark::after, .mark span { display: block; width: 13px; height: 2px; border-radius: 4px; background: #5ef0b0; content: ''; }
+.mark::before { transform: translateY(5px) rotate(45deg); }
+.mark::after { transform: translateY(-5px) rotate(-45deg); }
+.mark span { position: absolute; width: 5px; height: 5px; border-radius: 50%; background: #e9fff5; }
+.nav { display: flex; align-items: center; gap: 28px; }
+.nav a { color: #a8b6ca; font-size: .88rem; text-decoration: none; transition: color .2s ease; }
+.nav a:hover, .nav a:focus-visible, .nav a.active { color: #f8fbff; outline: none; }
+.nav a.active { position: relative; }
+.nav a.active::after { position: absolute; right: 0; bottom: -10px; left: 0; height: 2px; border-radius: 9px; background: #5ef0b0; content: ''; }
+.cta { display: inline-flex; align-items: center; gap: 9px; padding: 10px 15px; border: 1px solid rgb(94 240 176 / 52%); border-radius: 9px; background: #5ef0b0; color: #07172a; font-size: .82rem; font-weight: 800; text-decoration: none; transition: transform .2s ease, box-shadow .2s ease; }
+.cta:hover, .cta:focus-visible { box-shadow: 0 8px 24px rgb(94 240 176 / 24%); outline: none; transform: translateY(-1px); }
+@media (max-width: 700px) {
+  .inner { width: min(100% - 28px, 560px); min-height: 68px; gap: 12px; }
+  .nav { gap: 13px; }
+  .nav a:first-child { display: none; }
+  .cta { padding: 9px 11px; font-size: .75rem; }
+}
